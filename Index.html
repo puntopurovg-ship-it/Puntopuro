@@ -32,11 +32,11 @@
   .topbar{
     position:relative;
     display:flex;
-    align-items:center;
-    justify-content:space-between;
+    align-items:flex-start;
+    justify-content:flex-start;
     flex-wrap:nowrap;
-    gap:8px;
-    padding:10px 14px;
+    gap:12px;
+    padding:10px 78px 10px 14px;
     min-height:88px;
     box-sizing:border-box;
     background-color:var(--aqua);
@@ -46,35 +46,33 @@
   .brand{
     display:flex;
     align-items:center;
-    gap:8px;
     font-family:'Fraunces', serif;
     font-weight:700;
     font-size:1.15rem;
     letter-spacing:0.01em;
-    position:relative;
-    z-index:1;
-    flex-shrink:1;
-    min-width:0;
-    max-width:70%;
-    padding:2px 0;
+    position:absolute;
+    top:8px;
+    right:10px;
+    z-index:2;
   }
   .brand img{
     display:block;
-    width:76px;
-    height:76px;
-    min-width:76px;
-    min-height:76px;
+    width:56px;
+    height:56px;
+    min-width:56px;
+    min-height:56px;
     flex-shrink:0;
     object-fit:contain;
-    border-radius:12px;
+    border-radius:10px;
     margin:0;
   }
   .topbar-controls{
-    flex-shrink:0;
+    flex-shrink:1;
     min-width:0;
     display:flex;
-    align-items:center;
-    gap:12px;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:6px;
     position:relative;
     z-index:1;
   }
@@ -109,18 +107,19 @@
   }
   .switch{
     display:flex;
-    flex-direction:row;
+    flex-direction:column;
     align-items:stretch;
     background:rgba(255,255,255,0.12);
     border-radius:14px;
     padding:3px;
     gap:2px;
+    width:92px;
   }
   .switch button{
     border:none;
     background:transparent;
     color:var(--white);
-    padding:6px 16px;
+    padding:6px 10px;
     border-radius:999px;
     font-family:'Space Grotesk', sans-serif;
     font-size:0.78rem;
@@ -934,13 +933,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
 <div class="topbar">
   <div class="topbar-controls">
     <span id="syncTag" style="font-size:0.68rem; color:rgba(255,255,255,0.55); text-transform:uppercase; letter-spacing:0.05em;">en línea</span>
-    <span id="offlineBadge" class="hidden" style="font-size:0.68rem; color:#FFD166; text-transform:uppercase; letter-spacing:0.05em; cursor:pointer;" onclick="intentarSincronizarOffline()">0 cambio(s) sin sincronizar</span>
+    <span id="offlineBadge" class="hidden" style="font-size:0.68rem; color:#FFD166; text-transform:uppercase; letter-spacing:0.05em; cursor:pointer; max-width:150px; white-space:normal; line-height:1.3;" onclick="intentarSincronizarOffline()">0 cambio(s) sin sincronizar</span>
     <div class="switch">
       <button id="tabPPBtn" onclick="showView('pp')">PP</button>
       <button id="tabVendedorBtn" onclick="showView('vendedor')">Vendedor</button>
@@ -999,7 +999,7 @@
           <div id="loyaltyPremio" class="hidden alert-box" style="margin-top:10px;">🎉 ¡Has recibido una recompensa! Tu próximo garrafón tiene descuento.</div>
           <div class="loyalty-footer">Acumula sellos con cada pedido de garrafón (20L) a domicilio.<br>Válido solo para entrega a domicilio.</div>
         </div>
-        <a class="btn btn-ghost" id="btnCompartirReferido" target="_blank" style="display:block; text-align:center; text-decoration:none; margin-bottom:10px;">🎁 Invita a un vecino y ambos ganan un garrafón</a>
+        <a class="btn btn-ghost" id="btnCompartirReferido" target="_blank" style="display:block; text-align:center; text-decoration:none; margin-bottom:10px;">🎁 Invita a un vecino y ambos reciben un descuento</a>
         <div id="repetirPedidoBox" class="hidden" style="margin-bottom:10px;"></div>
         <p class="sub" style="margin-bottom:8px;">¿Cuántos garrafones quieres?</p>
         <div class="stepper">
@@ -1030,6 +1030,7 @@
           <p id="graciasTexto">Hemos recibido tu pedido y será enviado a tu dirección.</p>
           <p id="graciasPrecio" class="precio-grande"></p>
           <div id="reciboDigital"></div>
+          <a class="btn btn-ghost" id="btnCompartirReferidoGracias" target="_blank" style="display:block; text-align:center; text-decoration:none; margin-top:10px;">🎁 Recomienda a un vecino y ambos reciben un descuento en su próxima compra</a>
           <button class="btn btn-primary" onclick="reiniciarCliente()">Hacer otro pedido</button>
           <button class="btn btn-ghost" onclick="salir()">Salir</button>
         </div>
@@ -1374,7 +1375,7 @@
           <input type="password" id="ppOlvideNueva" placeholder="Nueva contraseña" autocomplete="off">
           <label for="ppOlvideNueva2">Repite la nueva contraseña</label>
           <input type="password" id="ppOlvideNueva2" placeholder="Repite la nueva contraseña" autocomplete="off">
-          <button class="btn btn-primary" style="margin-top:8px;" onclick="guardarNuevaContrasenaOlvide()">Guardar nueva contraseña</button>
+          <button class="btn btn-primary" style="margin-top:8px;" onclick="conProcesando(this, guardarNuevaContrasenaOlvide)">Guardar nueva contraseña</button>
         </div>
       </div>
     </div>
@@ -1475,7 +1476,7 @@
           <input type="text" id="ppPrecioCfg" inputmode="decimal" placeholder="18">
           <label for="ppPrecioPromoCfg">Precio promoción ($)</label>
           <input type="text" id="ppPrecioPromoCfg" inputmode="decimal" placeholder="10">
-          <button class="btn btn-primary" style="margin-top:8px;" onclick="guardarPrecioGarrafonCfg()">Guardar precios</button>
+          <button class="btn btn-primary" style="margin-top:8px;" onclick="conProcesando(this, guardarPrecioGarrafonCfg)">Guardar precios</button>
           <p id="ppPrecioCfgMsg" style="font-size:0.8rem; color:#0B6E63; margin-top:8px;"></p>
           <p class="sub" style="margin:10px 0 4px;">Historial de cambios (quién y cuándo):</p>
           <div id="ppHistorialPrecios"></div>
@@ -1491,8 +1492,8 @@
           <input type="text" id="ppLimpiezaNombre" placeholder="Ej. Jabón líquido">
           <label for="ppLimpiezaPrecio">Precio por litro ($)</label>
           <input type="text" id="ppLimpiezaPrecio" inputmode="decimal" placeholder="35">
-          <button class="btn btn-ghost" style="margin-top:8px;" onclick="agregarProductoLimpieza()">+ Agregar producto</button>
-          <button class="btn btn-primary" style="margin-top:8px;" onclick="guardarLimpiezaCfg()">Guardar cambios de limpieza</button>
+          <button class="btn btn-ghost" style="margin-top:8px;" onclick="conProcesando(this, agregarProductoLimpieza)">+ Agregar producto</button>
+          <button class="btn btn-primary" style="margin-top:8px;" onclick="conProcesando(this, guardarLimpiezaCfg)">Guardar cambios de limpieza</button>
           <p id="ppLimpiezaMsg" style="font-size:0.8rem; color:#0B6E63; margin-top:8px;"></p>
         </div>
         <div class="totals-card" style="margin-top:16px;">
@@ -1506,7 +1507,7 @@
           <input type="number" id="ppMetaGeneralGarrafones" min="0" placeholder="Ej. 1500">
           <label for="ppMetaGeneralLitros">Litros de productos de limpieza</label>
           <input type="text" id="ppMetaGeneralLitros" inputmode="decimal" placeholder="Ej. 200">
-          <button class="btn btn-primary" style="margin-top:8px;" onclick="guardarMetaGeneral()">Guardar meta general</button>
+          <button class="btn btn-primary" style="margin-top:8px;" onclick="conProcesando(this, guardarMetaGeneral)">Guardar meta general</button>
           <p id="ppMetaGeneralMsg" style="font-size:0.8rem; color:#0B6E63; margin-top:8px;"></p>
 
           <p class="sub" style="margin:16px 0 4px; font-weight:700;">Meta por vendedor</p>
@@ -1518,7 +1519,7 @@
           <input type="number" id="ppMetaVendedorGarrafones" min="0" placeholder="Ej. 400">
           <label for="ppMetaVendedorLitros">Litros de productos de limpieza</label>
           <input type="text" id="ppMetaVendedorLitros" inputmode="decimal" placeholder="Ej. 50">
-          <button class="btn btn-primary" style="margin-top:8px;" onclick="guardarMetaVendedor()">Guardar meta de este vendedor</button>
+          <button class="btn btn-primary" style="margin-top:8px;" onclick="conProcesando(this, guardarMetaVendedor)">Guardar meta de este vendedor</button>
           <p id="ppMetaVendedorMsg" style="font-size:0.8rem; color:#0B6E63; margin-top:8px;"></p>
         </div>
       </div>
@@ -1556,7 +1557,7 @@
           <label for="ppReferidosMensaje" style="margin-top:10px;">Mensaje para compartir</label>
           <textarea id="ppReferidosMensaje" rows="4" style="width:100%; border:1px solid var(--line); border-radius:12px; padding:10px; font-family:inherit; font-size:0.9rem;" placeholder="Usa {link} donde quieras que aparezca el link de invitación"></textarea>
           <p class="sub" style="margin:6px 0 0; font-size:0.75rem;">Usa <strong>{link}</strong> en el texto donde quieras que aparezca el link de invitación.</p>
-          <button class="btn btn-primary" style="margin-top:8px;" onclick="guardarReferidosCfg()">Guardar programa de referidos</button>
+          <button class="btn btn-primary" style="margin-top:8px;" onclick="conProcesando(this, guardarReferidosCfg)">Guardar programa de referidos</button>
           <p id="ppReferidosMsg" style="font-size:0.8rem; color:#0B6E63; margin-top:8px;"></p>
         </div>
         <div class="totals-card" style="margin-top:16px;">
@@ -1566,7 +1567,7 @@
           </label>
           <label for="ppBannerTexto" style="margin-top:10px;">Texto del aviso</label>
           <input type="text" id="ppBannerTexto" placeholder="¡Feliz Navidad! / Promo de la semana...">
-          <button class="btn btn-primary" style="margin-top:8px;" onclick="guardarBannerCfg()">Guardar mensaje</button>
+          <button class="btn btn-primary" style="margin-top:8px;" onclick="conProcesando(this, guardarBannerCfg)">Guardar mensaje</button>
           <p id="ppBannerMsg" style="font-size:0.8rem; color:#0B6E63; margin-top:8px;"></p>
         </div>
         <div class="totals-card" style="margin-top:16px;">
@@ -1592,9 +1593,9 @@
             <input type="text" id="ppTicketSeccionTitulo" placeholder="Título de la sección" style="margin-bottom:0;">
           </div>
           <textarea id="ppTicketSeccionTexto" rows="2" style="width:100%; border:1px solid var(--line); border-radius:12px; padding:10px; font-family:inherit; font-size:0.9rem; margin-top:8px;" placeholder="Texto de la sección, ej. términos, redes sociales, etc."></textarea>
-          <button class="btn btn-ghost" style="margin-top:8px;" onclick="agregarSeccionTicket()">+ Agregar sección</button>
+          <button class="btn btn-ghost" style="margin-top:8px;" onclick="conProcesando(this, agregarSeccionTicket)">+ Agregar sección</button>
 
-          <button class="btn btn-primary" style="margin-top:14px;" onclick="guardarTicketCfg()">Guardar diseño del tiket</button>
+          <button class="btn btn-primary" style="margin-top:14px;" onclick="conProcesando(this, guardarTicketCfg)">Guardar diseño del tiket</button>
           <p id="ppTicketMsg" style="font-size:0.8rem; color:#0B6E63; margin-top:8px;"></p>
         </div>
       </div>
@@ -1612,7 +1613,7 @@
           <input type="password" id="ppCambiarNueva" placeholder="Nueva contraseña" autocomplete="off">
           <label for="ppCambiarNueva2">Repite la nueva contraseña</label>
           <input type="password" id="ppCambiarNueva2" placeholder="Repite la nueva contraseña" autocomplete="off">
-          <button class="btn btn-primary" style="margin-top:8px;" onclick="cambiarContrasenaPP()">Actualizar contraseña</button>
+          <button class="btn btn-primary" style="margin-top:8px;" onclick="conProcesando(this, cambiarContrasenaPP)">Actualizar contraseña</button>
           <p id="ppCambiarError" style="font-size:0.8rem; margin-top:8px;"></p>
         </div>
         <div class="totals-card" style="margin-top:16px;">
@@ -1630,7 +1631,7 @@
           <label style="display:flex; align-items:center; gap:8px; font-weight:600; margin-top:4px;">
             <input type="checkbox" id="ppSupervisorVeBitacoras" style="width:auto;"> Bitácoras
           </label>
-          <button class="btn btn-primary" style="margin-top:12px;" onclick="guardarSupervisorPass()">Guardar</button>
+          <button class="btn btn-primary" style="margin-top:12px;" onclick="conProcesando(this, guardarSupervisorPass)">Guardar</button>
           <p id="ppSupervisorMsg" style="font-size:0.8rem; color:#0B6E63; margin-top:8px;"></p>
         </div>
       </div>
@@ -1647,7 +1648,7 @@
           </label>
           <p class="sub" style="margin:10px 0 4px; font-size:0.78rem;">Activa los días que abren y pon su horario — no todos los días tienen que ser iguales.</p>
           <div id="ppHorarioDias"></div>
-          <button class="btn btn-primary" style="margin-top:8px;" onclick="guardarHorarioCfg()">Guardar horario</button>
+          <button class="btn btn-primary" style="margin-top:8px;" onclick="conProcesando(this, guardarHorarioCfg)">Guardar horario</button>
           <p id="ppHorarioMsg" style="font-size:0.8rem; color:#0B6E63; margin-top:8px;"></p>
         </div>
         <div class="totals-card" style="margin-top:16px;">
@@ -1660,7 +1661,7 @@
           <p class="sub" style="margin-top:0;">Número al que llega el botón de WhatsApp visible en la pantalla principal y en pedidos. Formato: 10 dígitos, sin espacios (ej. 6180000000).</p>
           <label for="ppWhatsappNegocio">Número de WhatsApp</label>
           <input type="text" id="ppWhatsappNegocio" inputmode="numeric" placeholder="6180000000">
-          <button class="btn btn-primary" style="margin-top:8px;" onclick="guardarWhatsappNegocio()">Guardar número</button>
+          <button class="btn btn-primary" style="margin-top:8px;" onclick="conProcesando(this, guardarWhatsappNegocio)">Guardar número</button>
           <p id="ppWhatsappMsg" style="font-size:0.8rem; color:#0B6E63; margin-top:8px;"></p>
         </div>
       </div>
@@ -1680,7 +1681,7 @@
           <p class="sub" style="margin-top:0;">Guarda una copia de todos los datos (clientes, pedidos, gastos, etc.) en una Hoja de Google Sheets dentro de tu Drive, por si la app llegara a fallar. Configúralo una sola vez.</p>
           <label for="driveUrlInput">URL de la aplicación web de Google Sheets</label>
           <input type="text" id="driveUrlInput" placeholder="https://script.google.com/macros/s/..../exec">
-          <button class="btn btn-primary" style="margin-top:8px;" onclick="guardarDriveConfig()">Guardar configuración</button>
+          <button class="btn btn-primary" style="margin-top:8px;" onclick="conProcesando(this, guardarDriveConfig)">Guardar configuración</button>
           <button class="btn btn-ghost" style="margin-top:8px;" onclick="respaldarADrive(true)">Respaldar ahora</button>
           <p id="driveEstado" style="font-size:0.8rem; color:#4B6E68; margin-top:8px;"></p>
         </div>
@@ -1915,7 +1916,7 @@
         <input type="text" id="ppPrecio" inputmode="decimal" placeholder="18">
         <label for="ppPrecioPromo">Modificar precio de garrafón promocional</label>
         <input type="text" id="ppPrecioPromo" inputmode="decimal" placeholder="10">
-        <button class="btn btn-ghost" style="margin-top:0; margin-bottom:16px;" onclick="guardarPrecioGarrafon()">Guardar precios</button>
+        <button class="btn btn-ghost" style="margin-top:0; margin-bottom:16px;" onclick="conProcesando(this, guardarPrecioGarrafon)">Guardar precios</button>
         <div class="pp-summary-box">
           <div class="row"><span>Pedidos hoy</span><span class="val" id="ppVentasPedidos">0</span></div>
           <div class="row"><span>Garrafones vendidos</span><span class="val" id="ppVentasGarrafones">0</span></div>
@@ -2170,7 +2171,7 @@
         <div id="bitacoraCampos"></div>
         <label for="bitResponsable">Responsable (nombre de quien registra)</label>
         <input type="text" id="bitResponsable" placeholder="Nombre completo">
-        <button class="btn btn-primary" onclick="guardarBitacora()">Guardar registro</button>
+        <button class="btn btn-primary" onclick="conProcesando(this, guardarBitacora)">Guardar registro</button>
         <h3 class="bucket-title">Historial</h3>
         <div id="bitacoraLista"></div>
       </div>
@@ -2968,7 +2969,7 @@
             </div>
           </div>
           <div style="display:flex; gap:8px; margin-top:8px;">
-            <button class="btn btn-primary" style="margin-top:0;" onclick="guardarEdicionCliente('${id}')">Guardar</button>
+            <button class="btn btn-primary" style="margin-top:0;" onclick="conProcesando(this, () => guardarEdicionCliente('${id}'))">Guardar</button>
             <button class="btn btn-ghost" style="margin-top:0;" onclick="clienteEditando=null; renderListaClientesVendedor();">Cancelar</button>
           </div>
         </div>`;
@@ -3572,11 +3573,14 @@
 
   function actualizarBotonReferido(clienteId, nombreCliente){
     const btn = document.getElementById('btnCompartirReferido');
-    if(!btn) return;
+    const btnGracias = document.getElementById('btnCompartirReferidoGracias');
+    if(!btn && !btnGracias) return;
     const link = `${location.origin}${location.pathname}?ref=${encodeURIComponent(clienteId)}`;
     const plantilla = CONFIG.referidosMensaje || "¡Hola! Te comparto Punto Puro. Usa este link para tu primer pedido: {link}";
     const texto = plantilla.includes('{link}') ? plantilla.replace(/\{link\}/g, link) : `${plantilla} ${link}`;
-    btn.href = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+    const href = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+    if(btn) btn.href = href;
+    if(btnGracias) btnGracias.href = href;
     actualizarBotonReportarProblema(clienteId, nombreCliente);
   }
 
@@ -3954,10 +3958,12 @@
     const subtotalLimpieza = subtotalLimpiezaCliente();
     const precioPedido = precioGarrafones + subtotalLimpieza;
     const folio = siguienteFolio++;
+    const clienteIdPedido = clienteActual.id;
+    const nombreClientePedido = clienteActual.nombre;
     pedidos.unshift({
       folio: folio,
-      clienteId: clienteActual.id,
-      nombre: clienteActual.nombre,
+      clienteId: clienteIdPedido,
+      nombre: nombreClientePedido,
       direccion: clienteActual.direccion,
       telefono: clienteActual.telefono || "",
       cantidad: cantidadActual,
@@ -3974,38 +3980,46 @@
       mensajePromo: mensajePromo,
       sinTarjeta: clienteActual.sinTarjeta || false
     });
-    await guardarPedidos();
-    await decrementarStockPorVenta(cantidadActual);
-    if(limpiezaDetalle && limpiezaDetalle.length){ await decrementarStockLimpiezaPorVenta(limpiezaDetalle); }
-    if(garrafonesRegaloUsados > 0 && CLIENTES[clienteActual.id]){
-      CLIENTES[clienteActual.id].garrafonesRegalo = Math.max(0, (CLIENTES[clienteActual.id].garrafonesRegalo || 0) - garrafonesRegaloUsados);
-      await guardarClientes();
-    }
-    if(garrafonesPrecioEspecialUsados > 0 && CLIENTES[clienteActual.id] && CLIENTES[clienteActual.id].garrafonesPrecioEspecial){
-      CLIENTES[clienteActual.id].garrafonesPrecioEspecial.cantidad = Math.max(0, (CLIENTES[clienteActual.id].garrafonesPrecioEspecial.cantidad || 0) - garrafonesPrecioEspecialUsados);
-      await guardarClientes();
-    }
-    if(descuentoMontoUsado > 0 && CLIENTES[clienteActual.id]){
-      CLIENTES[clienteActual.id].descuentoMontoPendiente = Math.max(0, (CLIENTES[clienteActual.id].descuentoMontoPendiente || 0) - descuentoMontoUsado);
-      await guardarClientes();
-    }
 
-    document.getElementById('graciasNombre').textContent = "¡Gracias, " + clienteActual.nombre.split(' ')[0] + "!";
+    // Mostramos la pantalla de "¡Gracias!" de inmediato — el pedido ya quedó
+    // registrado localmente. Los guardados en la nube siguen abajo, en segundo
+    // plano, para que una red lenta no deje al cliente esperando en blanco.
+    document.getElementById('graciasNombre').textContent = "¡Gracias, " + nombreClientePedido.split(' ')[0] + "!";
     const imgGracias = document.getElementById('thanksImg');
     if(imgGracias && THANKS_IMG_ORIGINAL) imgGracias.src = THANKS_IMG_ORIGINAL;
     let textoGracias = "Hemos recibido tu pedido de " + cantidadActual + " garrafón(es). Será enviado a " + clienteActual.direccion + ".";
     if(garrafonesPromo > 0){ textoGracias += " " + mensajePromo; }
     document.getElementById('graciasTexto').textContent = textoGracias;
     document.getElementById('graciasPrecio').textContent = "Total a pagar: " + money(precioPedido);
-    mostrarReciboDigital(folio, clienteActual.nombre, clienteActual.direccion, cantidadActual, precioGarrafones, limpiezaDetalle, precioPedido);
+    mostrarReciboDigital(folio, nombreClientePedido, clienteActual.direccion, cantidadActual, precioGarrafones, limpiezaDetalle, precioPedido);
+    actualizarBotonReferido(clienteIdPedido, nombreClientePedido);
     limpiezaSeleccionCliente = {};
-    if(muestraGratisPendiente && CLIENTES[clienteActual.id]){
-      delete CLIENTES[clienteActual.id].muestraLimpiezaPendiente;
-      await guardarClientes();
-    }
+    const teniaMuestraGratis = !!muestraGratisPendiente;
     muestraGratisPendiente = null;
     document.getElementById('clienteStep2').classList.add('hidden');
     document.getElementById('clienteStep3').classList.remove('hidden');
+
+    // A partir de aquí, todo se guarda en segundo plano (sin "await" bloqueando
+    // la pantalla). Si la red falla, cada función ya sabe encolarse sola.
+    guardarPedidos();
+    decrementarStockPorVenta(cantidadActual);
+    if(limpiezaDetalle && limpiezaDetalle.length){ decrementarStockLimpiezaPorVenta(limpiezaDetalle); }
+    if(garrafonesRegaloUsados > 0 && CLIENTES[clienteIdPedido]){
+      CLIENTES[clienteIdPedido].garrafonesRegalo = Math.max(0, (CLIENTES[clienteIdPedido].garrafonesRegalo || 0) - garrafonesRegaloUsados);
+      guardarClientes();
+    }
+    if(garrafonesPrecioEspecialUsados > 0 && CLIENTES[clienteIdPedido] && CLIENTES[clienteIdPedido].garrafonesPrecioEspecial){
+      CLIENTES[clienteIdPedido].garrafonesPrecioEspecial.cantidad = Math.max(0, (CLIENTES[clienteIdPedido].garrafonesPrecioEspecial.cantidad || 0) - garrafonesPrecioEspecialUsados);
+      guardarClientes();
+    }
+    if(descuentoMontoUsado > 0 && CLIENTES[clienteIdPedido]){
+      CLIENTES[clienteIdPedido].descuentoMontoPendiente = Math.max(0, (CLIENTES[clienteIdPedido].descuentoMontoPendiente || 0) - descuentoMontoUsado);
+      guardarClientes();
+    }
+    if(teniaMuestraGratis && CLIENTES[clienteIdPedido]){
+      delete CLIENTES[clienteIdPedido].muestraLimpiezaPendiente;
+      guardarClientes();
+    }
     }finally{
       if(btn){ btn.disabled = false; btn.textContent = "Realizar pedido"; }
     }
@@ -4032,7 +4046,7 @@
       (limpiezaDetalle || []).map(i => `${i.nombre} (${i.litros}L): ${money(i.subtotal)}`).join('\n') +
       `${(limpiezaDetalle||[]).length ? '\n' : ''}Total: ${money(total)}\n\n${CONFIG.ticketMensajeFinal || ''}`;
     cont.innerHTML = `
-      <div class="totals-card" style="margin-top:14px; text-align:left;">
+      <div class="totals-card" id="reciboDigitalTicket" style="margin-top:14px; text-align:left;">
         <h2 style="margin-top:0; font-size:1.1rem;">🧾 ${CONFIG.ticketTitulo || 'Punto Puro'} · #${folio}</h2>
         ${CONFIG.ticketSucursal ? `<p style="font-size:0.78rem; color:#4B6E68; margin:0 0 4px; white-space:pre-line;">${CONFIG.ticketSucursal}</p>` : ''}
         <p style="font-size:0.8rem; color:#4B6E68; margin-top:0;">${fecha}</p>
@@ -4040,9 +4054,29 @@
         <div style="display:flex; justify-content:space-between; font-weight:800; font-size:1.05rem; margin-top:8px; padding-top:8px; border-top:1px solid var(--line); color:${colorTotal};"><span>Total</span><span>${money(total)}</span></div>
         ${seccionesExtra}
         ${CONFIG.ticketMensajeFinal ? `<p style="text-align:center; font-size:0.85rem; color:${colorTotal}; font-weight:600; margin-top:12px;">${CONFIG.ticketMensajeFinal}</p>` : ''}
-        <button class="btn btn-ghost" style="margin-top:10px;" onclick="window.print()">🖨️ Imprimir recibo</button>
-        <a class="btn btn-ghost" style="margin-top:8px; display:block; text-align:center; text-decoration:none;" target="_blank" href="https://wa.me/?text=${encodeURIComponent(textoCompartir)}">💬 Compartir recibo por WhatsApp</a>
-      </div>`;
+      </div>
+      <button class="btn btn-ghost" id="btnGuardarTicket" style="margin-top:10px;" onclick="conProcesando(this, guardarTicketComoImagen)">💾 Guardar ticket</button>`;
+  }
+
+  async function guardarTicketComoImagen(){
+    const el = document.getElementById('reciboDigitalTicket');
+    if(!el || typeof html2canvas === 'undefined'){
+      mostrarMensajeGotita('No se pudo generar la imagen del ticket.');
+      return;
+    }
+    try{
+      const canvas = await html2canvas(el, { backgroundColor: '#ffffff', scale: 2 });
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'ticket-punto-puro.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      mostrarMensajeGotita('💾 Ticket guardado');
+    }catch(e){
+      mostrarMensajeGotita('No se pudo guardar el ticket. Intenta de nuevo.');
+    }
   }
 
   function reiniciarCliente(){
@@ -4922,7 +4956,7 @@
     referidosTipoPremio: "garrafon",
     referidosLimpiezaProducto: "",
     referidosLimpiezaLitros: 1,
-    referidosMensaje: "¡Hola! Te comparto Punto Puro, entrega de garrafones a domicilio. Si pides tu primer garrafón con este link, tú y yo ganamos un garrafón gratis 💧🎁: {link}",
+    referidosMensaje: "¡Hola! Te comparto Punto Puro, entrega de garrafones a domicilio. Si pides tu primer garrafón con este link, tú y yo recibimos un descuento en nuestra próxima compra 💧🎁: {link}",
     ticketTitulo: "Punto Puro",
     ticketSucursal: "",
     ticketMensajeFinal: "¡Gracias por tu compra!",
@@ -6936,7 +6970,7 @@
           ${(c.saldoPendiente || 0) > 0 ? `<div class="alert-box">Saldo pendiente (fiado): <span class="saldo-tag">${money(c.saldoPendiente)}</span></div>
           <button class="btn btn-ghost" style="margin-top:0;" onclick="marcarSaldoPagado('${id}')">Marcar saldo como pagado</button>` : ''}
           <div style="display:flex; gap:8px; margin-top:8px;">
-            <button class="btn btn-primary" style="margin-top:0;" onclick="guardarEdicionCliente('${id}')">Guardar</button>
+            <button class="btn btn-primary" style="margin-top:0;" onclick="conProcesando(this, () => guardarEdicionCliente('${id}'))">Guardar</button>
             <button class="btn btn-ghost" style="margin-top:0;" onclick="clienteEditando=null; renderListaClientes();">Cancelar</button>
           </div>
         </div>`;
