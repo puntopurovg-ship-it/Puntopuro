@@ -940,7 +940,7 @@
 <div class="topbar">
   <div class="topbar-controls">
     <span id="syncTag" style="font-size:0.68rem; color:rgba(255,255,255,0.55); text-transform:uppercase; letter-spacing:0.05em;">en línea</span>
-    <span id="offlineBadge" class="hidden" style="font-size:0.68rem; color:#FFD166; text-transform:uppercase; letter-spacing:0.05em; cursor:pointer; max-width:150px; white-space:normal; line-height:1.3;" onclick="intentarSincronizarOffline()">0 cambio(s) sin sincronizar</span>
+    <span id="offlineBadge" class="hidden" style="font-size:0.68rem; color:#FFD166; text-transform:uppercase; letter-spacing:0.05em; cursor:pointer; max-width:150px; white-space:normal; line-height:1.3;" onclick="intentarSincronizarOffline(true)">0 cambio(s) sin sincronizar</span>
     <div class="switch">
       <button id="tabPPBtn" onclick="showView('pp')">PP</button>
       <button id="tabVendedorBtn" onclick="showView('vendedor')">Vendedor</button>
@@ -2399,15 +2399,19 @@
     return () => { btn.disabled = false; btn.textContent = textoOriginal; };
   }
 
+  let ultimoErrorSync = "";
+
   async function storageSetSeguro(key, value, shared){
     try{
       if(!navigator.onLine) throw new Error('sin conexión');
       const r = await window.storage.set(key, value, shared);
       marcarConConexion();
+      ultimoErrorSync = "";
       const cola = leerColaOffline();
       if(cola[key]){ delete cola[key]; guardarColaOffline(cola); actualizarBadgePendientesOffline(); }
       return r;
     }catch(e){
+      ultimoErrorSync = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
       marcarSinConexion();
       const cola = leerColaOffline();
       cola[key] = { value, shared, ts: Date.now() };
@@ -2418,7 +2422,7 @@
   }
 
   let sincronizandoOffline = false;
-  async function intentarSincronizarOffline(){
+  async function intentarSincronizarOffline(mostrarDiagnostico){
     if(sincronizandoOffline || !navigator.onLine) return;
     const cola = leerColaOffline();
     const claves = Object.keys(cola);
@@ -2430,10 +2434,18 @@
         const colaActual = leerColaOffline();
         delete colaActual[key];
         guardarColaOffline(colaActual);
-      }catch(e){ /* seguimos sin conexión, se reintenta luego */ }
+        ultimoErrorSync = "";
+      }catch(e){
+        ultimoErrorSync = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
+      }
     }
     actualizarBadgePendientesOffline();
-    if(Object.keys(leerColaOffline()).length === 0){ marcarConConexion(); mostrarMensajeGotita("💧 Todo sincronizado"); }
+    if(Object.keys(leerColaOffline()).length === 0){
+      marcarConConexion();
+      mostrarMensajeGotita("💧 Todo sincronizado");
+    }else if(mostrarDiagnostico){
+      alert("Todavía no se pudo sincronizar.\n\nDetalle técnico: " + (ultimoErrorSync || "desconocido") + "\n\nSi dice \"permission-denied\", el problema son las reglas de Firestore (no están publicadas o caducaron). Si dice \"tiempo de espera agotado\" o \"unavailable\", es la conexión a internet.");
+    }
     sincronizandoOffline = false;
   }
 
