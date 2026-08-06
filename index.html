@@ -1672,6 +1672,17 @@
         <p id="ppRestaurarMsg" style="font-size:0.8rem; margin-top:6px;"></p>
         <button class="btn btn-ghost" style="margin-top:10px;" onclick="exportarTodoAExcel()">📊 Exportar todo a Excel</button>
         <div class="totals-card" style="margin-top:16px;">
+          <h2 style="margin-top:0; font-size:1rem;">🔍 Diagnóstico de sincronización</h2>
+          <p class="sub" style="margin-top:0;">Aquí se queda guardado el detalle técnico del último error, aunque hayas cerrado la alerta. Útil para mandarlo por WhatsApp a soporte.</p>
+          <p style="font-size:0.85rem; margin:4px 0;">Estado: <strong id="diagEstado">—</strong></p>
+          <p style="font-size:0.85rem; margin:4px 0;">Cambios pendientes: <strong id="diagPendientes">—</strong></p>
+          <p style="font-size:0.85rem; margin:4px 0;">Último error: <strong id="diagUltimoError">Ninguno registrado</strong></p>
+          <p style="font-size:0.85rem; margin:4px 0;">Hora del error: <strong id="diagUltimoErrorHora">—</strong></p>
+          <button class="btn btn-ghost" style="margin-top:8px;" onclick="copiarDiagnosticoSync()">📋 Copiar diagnóstico</button>
+          <button class="btn btn-ghost" style="margin-top:8px;" onclick="enviarDiagnosticoSyncWhatsapp()">💬 Enviar diagnóstico por WhatsApp</button>
+          <p id="diagCopiadoMsg" style="font-size:0.8rem; color:#0B6E63; margin-top:6px;"></p>
+        </div>
+        <div class="totals-card" style="margin-top:16px;">
           <h2 style="margin-top:0; font-size:1rem;">☁️ Respaldo automático a Google Drive</h2>
           <p class="sub" style="margin-top:0;">Guarda una copia de todos los datos (clientes, pedidos, gastos, etc.) en una Hoja de Google Sheets dentro de tu Drive, por si la app llegara a fallar. Configúralo una sola vez.</p>
           <label for="driveUrlInput">URL de la aplicación web de Google Sheets</label>
@@ -2358,18 +2369,36 @@
   let bitacoraActual = 'calidad';
   let bitacoras = { calidad: [], limpieza: [], plagas: [], laboratorio: [], capacitacion: [] };
 
-  function marcarSinConexion(){
-    if(sinConexion) return;
-    sinConexion = true;
+  // La etiqueta de arriba (syncTag) ya NO depende solo de si la última operación
+  // tuvo éxito o falló: siempre refleja el estado real de la cola completa de
+  // pendientes, para que nunca diga "sincronizado" mientras todavía haya
+  // cambios atorados sin subir (eso era lo que causaba el mensaje contradictorio).
+  function actualizarEtiquetaSync(){
     const tag = document.getElementById('syncTag');
-    if(tag){ tag.textContent = "modo local"; tag.classList.add('offline'); }
+    if(!tag) return;
+    if(sinConexion){
+      tag.textContent = "modo local";
+      tag.classList.add('offline');
+      return;
+    }
+    const pendientes = Object.keys(leerColaOffline()).length;
+    if(pendientes > 0){
+      tag.textContent = "sincronizando…";
+      tag.classList.add('offline');
+    }else{
+      tag.textContent = "sincronizado";
+      tag.classList.remove('offline');
+    }
+  }
+
+  function marcarSinConexion(){
+    sinConexion = true;
+    actualizarEtiquetaSync();
   }
 
   function marcarConConexion(){
-    if(!sinConexion) return;
     sinConexion = false;
-    const tag = document.getElementById('syncTag');
-    if(tag){ tag.textContent = "sincronizado"; tag.classList.remove('offline'); }
+    actualizarEtiquetaSync();
   }
 
   const OFFLINE_QUEUE_KEY = "puntopuro_cola_offline";
@@ -2387,12 +2416,54 @@
 
   function actualizarBadgePendientesOffline(){
     const badge = document.getElementById('offlineBadge');
-    if(!badge) return;
-    if(vistaActual === 'cliente'){ badge.classList.add('hidden'); return; }
-    const cola = leerColaOffline();
-    const n = Object.keys(cola).length;
-    if(n > 0){ badge.textContent = `${n} cambio(s) sin sincronizar`; badge.classList.remove('hidden'); }
-    else{ badge.classList.add('hidden'); }
+    if(badge){
+      if(vistaActual === 'cliente'){ badge.classList.add('hidden'); }
+      else{
+        const cola = leerColaOffline();
+        const n = Object.keys(cola).length;
+        if(n > 0){ badge.textContent = `${n} cambio(s) sin sincronizar`; badge.classList.remove('hidden'); }
+        else{ badge.classList.add('hidden'); }
+      }
+    }
+    // Cada vez que se recalcula el número de pendientes, la etiqueta de arriba
+    // se vuelve a evaluar también, así los dos avisos siempre dicen lo mismo.
+    actualizarEtiquetaSync();
+    actualizarPanelDiagnosticoSync();
+  }
+
+  // Llena el panel de diagnóstico en PP > Configuración > Respaldos y datos
+  // (si esa pantalla no está en uso, los elementos no existen y no hace nada).
+  function actualizarPanelDiagnosticoSync(){
+    const elEstado = document.getElementById('diagEstado');
+    if(!elEstado) return;
+    const pendientes = Object.keys(leerColaOffline()).length;
+    elEstado.textContent = sinConexion ? "modo local" : (pendientes > 0 ? "sincronizando…" : "sincronizado");
+    document.getElementById('diagPendientes').textContent = String(pendientes);
+    document.getElementById('diagUltimoError').textContent = ultimoErrorSync || "Ninguno registrado";
+    document.getElementById('diagUltimoErrorHora').textContent = ultimoErrorSyncTs ? new Date(ultimoErrorSyncTs).toLocaleString('es-MX') : "—";
+  }
+
+  function textoDiagnosticoSync(){
+    const pendientes = Object.keys(leerColaOffline()).length;
+    const estado = sinConexion ? "modo local" : (pendientes > 0 ? "sincronizando…" : "sincronizado");
+    const hora = ultimoErrorSyncTs ? new Date(ultimoErrorSyncTs).toLocaleString('es-MX') : "—";
+    return `Diagnóstico Punto Puro\nEstado: ${estado}\nCambios pendientes: ${pendientes}\nÚltimo error: ${ultimoErrorSync || "Ninguno registrado"}\nHora del error: ${hora}`;
+  }
+
+  async function copiarDiagnosticoSync(){
+    const texto = textoDiagnosticoSync();
+    const msg = document.getElementById('diagCopiadoMsg');
+    try{
+      await navigator.clipboard.writeText(texto);
+      if(msg) msg.textContent = "Copiado. Ya lo puedes pegar donde quieras.";
+    }catch(e){
+      if(msg) msg.textContent = "No se pudo copiar automático. Cópialo a mano: " + texto;
+    }
+  }
+
+  function enviarDiagnosticoSyncWhatsapp(){
+    const texto = textoDiagnosticoSync();
+    window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank");
   }
 
   // Todas las escrituras a la nube pasan por aquí. Si no hay internet (o falla el guardado),
@@ -2410,18 +2481,21 @@
   }
 
   let ultimoErrorSync = "";
+  let ultimoErrorSyncTs = null;
 
   async function storageSetSeguro(key, value, shared){
     try{
       if(!navigator.onLine) throw new Error('sin conexión');
       const r = await window.storage.set(key, value, shared);
-      marcarConConexion();
+      sinConexion = false;
       ultimoErrorSync = "";
       const cola = leerColaOffline();
-      if(cola[key]){ delete cola[key]; guardarColaOffline(cola); actualizarBadgePendientesOffline(); }
+      if(cola[key]){ delete cola[key]; guardarColaOffline(cola); }
+      actualizarBadgePendientesOffline();
       return r;
     }catch(e){
       ultimoErrorSync = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
+      ultimoErrorSyncTs = Date.now();
       marcarSinConexion();
       const cola = leerColaOffline();
       cola[key] = { value, shared, ts: Date.now() };
@@ -2458,6 +2532,7 @@
           ultimoErrorSync = "";
         }catch(e){
           ultimoErrorSync = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
+          ultimoErrorSyncTs = Date.now();
         }
       }
       actualizarBadgePendientesOffline();
