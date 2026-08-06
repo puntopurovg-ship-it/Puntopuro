@@ -2541,17 +2541,17 @@
   let sincronizandoOffline = false;
   async function intentarSincronizarOffline(mostrarDiagnostico){
     if(!navigator.onLine){
-      if(mostrarDiagnostico) alert("Tu celular dice que no tiene conexión a internet en este momento (WiFi o datos apagados, o señal muy mala). Revisa tu conexión e inténtalo de nuevo.");
+      if(mostrarDiagnostico) mostrarMensajeGotita("📴 Sin conexión a internet ahorita");
       return;
     }
     if(sincronizandoOffline){
-      if(mostrarDiagnostico) alert("Ya se está intentando sincronizar, espera unos segundos y vuelve a intentar.");
+      if(mostrarDiagnostico) mostrarMensajeGotita("🔄 Ya se está sincronizando, un momento…");
       return;
     }
     const cola = leerColaOffline();
     const claves = Object.keys(cola);
     if(claves.length === 0){
-      if(mostrarDiagnostico) alert("No hay nada pendiente por sincronizar en este celular ahora mismo. Si sigues viendo el aviso, cierra la app por completo y vuelve a abrirla.");
+      if(mostrarDiagnostico) mostrarMensajeGotita("✅ Nada pendiente por sincronizar");
       return;
     }
     sincronizandoOffline = true;
@@ -2574,10 +2574,10 @@
         marcarConConexion();
         mostrarMensajeGotita("💧 Todo sincronizado");
       }else if(mostrarDiagnostico){
-        alert("Todavía no se pudo sincronizar.\n\nDetalle técnico: " + (ultimoErrorSync || "desconocido") + "\n\nSi dice \"permission-denied\", el problema son las reglas de Firestore (no están publicadas o caducaron). Si dice \"tiempo de espera agotado\" o \"unavailable\", es la conexión a internet.");
+        mostrarMensajeGotita("⚠️ Todavía no se pudo sincronizar. Ve a PP > Configuración > Respaldos y datos para ver el detalle técnico.", 5000);
       }
     }catch(e){
-      if(mostrarDiagnostico) alert("Ocurrió un error inesperado al intentar sincronizar: " + (e && e.message ? e.message : String(e)));
+      if(mostrarDiagnostico) mostrarMensajeGotita("⚠️ Error inesperado al sincronizar", 5000);
     }finally{
       sincronizandoOffline = false;
     }
