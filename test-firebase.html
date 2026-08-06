@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba de conexión - Punto Puro</title>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<style>
+  body{ font-family: -apple-system, sans-serif; background:#F3F5F7; margin:0; padding:24px 16px; color:#0B3D3A; }
+  h1{ font-size:1.3rem; }
+  #resultado{ background:#fff; border-radius:12px; padding:20px; margin-top:16px; font-size:1.05rem; line-height:1.6; white-space:pre-wrap; min-height:120px; }
+  .ok{ color:#0B6E63; font-weight:700; }
+  .fail{ color:#C0392B; font-weight:700; }
+  button{ margin-top:16px; padding:14px 20px; font-size:1rem; border-radius:10px; border:none; background:#0B6E63; color:#fff; font-weight:700; width:100%; }
+  .paso{ margin-bottom:6px; }
+</style>
+</head>
+<body>
+  <h1>🔬 Prueba directa de conexión a Firebase</h1>
+  <p>Esto NO es la app completa, es solo una prueba aislada: intenta guardar un dato chiquito y leerlo de vuelta. Así vemos si el problema es de Firebase/tu red, sin toda la complicación de la app de por medio.</p>
+  <div id="resultado">Cargando…</div>
+  <button onclick="location.reload()">🔁 Probar de nuevo</button>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyB2by3Z4mXCrQzf_WOuqLJsZ39vJBz3YLU",
+    authDomain: "punto-puro.firebaseapp.com",
+    projectId: "punto-puro",
+    storageBucket: "punto-puro.firebasestorage.app",
+    messagingSenderId: "615820357167",
+    appId: "1:615820357167:web:31fb09fbe47ecf26c120da"
+  };
+
+  const salida = document.getElementById('resultado');
+  function log(linea){ salida.innerHTML += (salida.innerHTML && salida.innerHTML !== 'Cargando…' ? '\n' : (salida.innerHTML==='Cargando…' ? '' : '\n')) + linea; }
+
+  async function correrPrueba(){
+    salida.innerHTML = '';
+    log('📱 Navegador: ' + navigator.userAgent);
+    log('🌐 navigator.onLine: ' + navigator.onLine);
+    log('');
+
+    let app, db;
+    try{
+      log('1️⃣ Inicializando Firebase…');
+      app = firebase.initializeApp(firebaseConfig);
+      db = app.firestore();
+      db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
+      log('   <span class="ok">✅ Inicializado sin error</span>');
+    }catch(e){
+      log('   <span class="fail">❌ Falló al inicializar: ' + (e && e.message ? e.message : e) + '</span>');
+      return;
+    }
+
+    const docRef = db.collection('diagnostico_conexion').doc('prueba_' + Date.now());
+    const t0 = Date.now();
+    log('');
+    log('2️⃣ Intentando GUARDAR un dato de prueba (sin límite de tiempo esta vez, para ver cuánto tarda de verdad)…');
+    try{
+      await docRef.set({ prueba: true, hecho_en: new Date().toString(), ts: Date.now() });
+      const ms = Date.now() - t0;
+      log('   <span class="ok">✅ ¡SÍ SE GUARDÓ! Tardó ' + ms + ' ms (' + (ms/1000).toFixed(1) + ' segundos)</span>');
+    }catch(e){
+      const ms = Date.now() - t0;
+      log('   <span class="fail">❌ FALLÓ después de ' + ms + ' ms</span>');
+      log('   <span class="fail">Error exacto: ' + (e && (e.code || e.message) ? (e.code || e.message) : String(e)) + '</span>');
+      log('');
+      log('👉 Con este error exacto (código: ' + (e && e.code ? e.code : 'sin código') + ') ya sabemos qué es. Mándaselo a Claude tal cual.');
+      return;
+    }
+
+    const t1 = Date.now();
+    log('');
+    log('3️⃣ Intentando LEER ese mismo dato de vuelta…');
+    try{
+      const snap = await docRef.get();
+      const ms = Date.now() - t1;
+      if(snap.exists){
+        log('   <span class="ok">✅ ¡SÍ SE LEYÓ! Tardó ' + ms + ' ms. Dato: ' + JSON.stringify(snap.data()) + '</span>');
+      }else{
+        log('   <span class="fail">⚠️ Se guardó pero al leerlo dice que no existe (raro)</span>');
+      }
+    }catch(e){
+      const ms = Date.now() - t1;
+      log('   <span class="fail">❌ Falló la lectura después de ' + ms + ' ms: ' + (e && (e.code || e.message) ? (e.code || e.message) : String(e)) + '</span>');
+      return;
+    }
+
+    log('');
+    log('<span class="ok">🎉 TODO BIEN: Firebase sí funciona desde este celular y esta red.</span>');
+    log('Si la app completa igual se traba, el problema ya no es la conexión a Firebase en sí, sino algo de cómo la app hace muchas cosas a la vez.');
+  }
+
+  correrPrueba();
+</script>
+</body>
+</html>
