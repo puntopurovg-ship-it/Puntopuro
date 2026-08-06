@@ -2585,6 +2585,13 @@
 
   window.addEventListener('online', intentarSincronizarOffline);
   setInterval(intentarSincronizarOffline, 10000);
+  // El temporizador de arriba puede quedar pausado por Android cuando la pantalla
+  // se apaga o cambias de app (para ahorrar batería). Por eso, cada vez que la
+  // pestaña vuelve a estar visible o la app recupera el foco, se fuerza un intento
+  // inmediato — así no se queda atorado esperando a que el temporizador reaccione.
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') intentarSincronizarOffline(); });
+  window.addEventListener('focus', intentarSincronizarOffline);
+  window.addEventListener('pageshow', intentarSincronizarOffline);
 
   async function cargarClientes(){
     try{
