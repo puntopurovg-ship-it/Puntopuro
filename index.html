@@ -2253,15 +2253,25 @@
       promesa,
       new Promise((_, reject) => setTimeout(() => reject(new Error('tiempo de espera agotado')), ms))
     ]);
+    const _esperar = (ms) => new Promise(r => setTimeout(r, ms));
+    // Reintenta hasta 3 veces (antes eran 2, una tras otra sin pausa). Ahora se deja
+    // una pequeña pausa entre intentos, porque en redes de datos móviles muy saturadas
+    // reintentar de inmediato suele fallar de la misma forma; darle un respiro ayuda.
+    async function _conReintentos(crearPromesa, intentos = 3, ms = 10000){
+      let ultimoError;
+      for(let i = 0; i < intentos; i++){
+        try{ return await _conTimeout(crearPromesa(), ms); }
+        catch(err){
+          ultimoError = err;
+          if(i < intentos - 1) await _esperar(1200);
+        }
+      }
+      throw ultimoError;
+    }
 
     window.storage = {
       async get(key, shared){
-        let snap;
-        try{
-          snap = await _conTimeout(_col.doc(_docId(key, shared)).get(), 7000);
-        }catch(primerError){
-          snap = await _conTimeout(_col.doc(_docId(key, shared)).get(), 7000);
-        }
+        const snap = await _conReintentos(() => _col.doc(_docId(key, shared)).get());
         if(!snap.exists) return null; // la clave simplemente no existe todavía: no es un error de conexión
         const data = snap.data();
         return { key, value: data.value, shared: !!shared };
@@ -2269,28 +2279,22 @@
       async set(key, value, shared){
         return _encolar(async () => {
           const payload = { key, shared: !!shared, value, actualizado: firebase.firestore.FieldValue.serverTimestamp() };
-          try{
-            await _conTimeout(_col.doc(_docId(key, shared)).set(payload), 7000);
-          }catch(primerError){
-            // Muchas veces el primer intento tarda porque la conexión apenas se está
-            // estableciendo; reintentamos una vez antes de darnos por vencidos del todo.
-            await _conTimeout(_col.doc(_docId(key, shared)).set(payload), 7000);
-          }
+          await _conReintentos(() => _col.doc(_docId(key, shared)).set(payload));
           return { key, value, shared: !!shared };
         });
       },
       async delete(key, shared){
         return _encolar(async () => {
           const ref = _col.doc(_docId(key, shared));
-          const snap = await _conTimeout(ref.get());
+          const snap = await _conReintentos(() => ref.get());
           const existed = snap.exists;
-          if(existed) await _conTimeout(ref.delete());
+          if(existed) await _conReintentos(() => ref.delete());
           return { key, deleted: existed, shared: !!shared };
         });
       },
       async list(prefix, shared){
         let q = _col.where('shared', '==', !!shared);
-        const snap = await _conTimeout(q.get());
+        const snap = await _conReintentos(() => q.get());
         const pre = prefix || '';
         const keys = [];
         snap.forEach(doc => { const k = doc.data().key; if(k && k.startsWith(pre)) keys.push(k); });
@@ -2497,12 +2501,15 @@
     catch(e){ return []; }
   }
 
-  // Guarda cada error de sincronización que ocurra (con fecha y la clave que falló),
-  // para poder verlos todos después en el Excel, no solo el más reciente.
-  function registrarErrorSync(clave, error){
+  // Guarda cada error de sincronización que ocurra (con fecha, la clave que falló y
+  // qué tan pesado era el dato que se intentaba mandar), para poder ver después en el
+  // Excel si el patrón tiene que ver con el tamaño del dato (ej. muchos pedidos
+  // acumulados) o con algo más general de la conexión.
+  function registrarErrorSync(clave, error, valor){
     try{
       const arr = leerHistorialErroresSync();
-      arr.push({ ts: Date.now(), clave: clave || '', error: error || '' });
+      const tamanoKB = valor ? Math.round((String(valor).length / 1024) * 10) / 10 : 0;
+      arr.push({ ts: Date.now(), clave: clave || '', error: error || '', tamanoKB });
       while(arr.length > 300) arr.shift(); // se guardan como máximo los últimos 300
       localStorage.setItem(HISTORIAL_ERRORES_KEY, JSON.stringify(arr));
     }catch(e){ /* almacenamiento local no disponible */ }
@@ -2521,7 +2528,7 @@
     }catch(e){
       ultimoErrorSync = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
       ultimoErrorSyncTs = Date.now();
-      registrarErrorSync(key, ultimoErrorSync);
+      registrarErrorSync(key, ultimoErrorSync, value);
       marcarSinConexion();
       const cola = leerColaOffline();
       cola[key] = { value, shared, ts: Date.now() };
@@ -2559,7 +2566,7 @@
         }catch(e){
           ultimoErrorSync = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
           ultimoErrorSyncTs = Date.now();
-          registrarErrorSync(key, ultimoErrorSync);
+          registrarErrorSync(key, ultimoErrorSync, cola[key] && cola[key].value);
         }
       }
       actualizarBadgePendientesOffline();
@@ -3358,9 +3365,9 @@
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(diagnosticoArr), "Diagnostico");
 
     const erroresArr = leerHistorialErroresSync().map(e => ({
-      Fecha: new Date(e.ts).toLocaleString('es-MX'), Clave: e.clave, Error: e.error
+      Fecha: new Date(e.ts).toLocaleString('es-MX'), Clave: e.clave, Error: e.error, TamanoKB: e.tamanoKB || ''
     }));
-    if(erroresArr.length === 0){ erroresArr.push({ Fecha: '', Clave: '', Error: 'Sin errores registrados en este celular' }); }
+    if(erroresArr.length === 0){ erroresArr.push({ Fecha: '', Clave: '', Error: 'Sin errores registrados en este celular', TamanoKB: '' }); }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(erroresArr), "ErroresSync");
 
     XLSX.writeFile(wb, `puntopuro_datos_${new Date().toISOString().slice(0,10)}.xlsx`);
