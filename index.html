@@ -2217,7 +2217,7 @@
     // En redes de celular (datos móviles) o con proxys, la conexión "normal" de Firestore
     // a veces se queda pegada sin avisar. Forzamos long-polling automático y activamos
     // caché local para que las cargas repetidas sean instantáneas y no dependan de la red.
-    _db.settings({ experimentalAutoDetectLongPolling: true, useFetchStreams: false });
+    _db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
     _db.enablePersistence({ synchronizeTabs: true }).catch(() => { /* no disponible en este navegador, seguimos sin caché local */ });
     const _col = _db.collection('ppStorage');
     const _docId = (key, shared) => (shared ? 'shared__' : 'private__') + key;
@@ -2227,21 +2227,33 @@
     // Si una operación con la nube tarda demasiado (mala señal, red caída a medias, etc.),
     // dejamos de esperarla para que la app no se quede pegada; el error se maneja
     // igual que "sin conexión" en el resto del código.
-    const _conTimeout = (promesa, ms = 8000) => Promise.race([
+    const _conTimeout = (promesa, ms = 12000) => Promise.race([
       promesa,
       new Promise((_, reject) => setTimeout(() => reject(new Error('tiempo de espera agotado')), ms))
     ]);
 
     window.storage = {
       async get(key, shared){
-        const snap = await _conTimeout(_col.doc(_docId(key, shared)).get());
+        let snap;
+        try{
+          snap = await _conTimeout(_col.doc(_docId(key, shared)).get(), 7000);
+        }catch(primerError){
+          snap = await _conTimeout(_col.doc(_docId(key, shared)).get(), 7000);
+        }
         if(!snap.exists) return null; // la clave simplemente no existe todavía: no es un error de conexión
         const data = snap.data();
         return { key, value: data.value, shared: !!shared };
       },
       async set(key, value, shared){
         return _encolar(async () => {
-          await _conTimeout(_col.doc(_docId(key, shared)).set({ key, shared: !!shared, value, actualizado: firebase.firestore.FieldValue.serverTimestamp() }));
+          const payload = { key, shared: !!shared, value, actualizado: firebase.firestore.FieldValue.serverTimestamp() };
+          try{
+            await _conTimeout(_col.doc(_docId(key, shared)).set(payload), 7000);
+          }catch(primerError){
+            // Muchas veces el primer intento tarda porque la conexión apenas se está
+            // estableciendo; reintentamos una vez antes de darnos por vencidos del todo.
+            await _conTimeout(_col.doc(_docId(key, shared)).set(payload), 7000);
+          }
           return { key, value, shared: !!shared };
         });
       },
