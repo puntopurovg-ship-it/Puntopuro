@@ -2349,6 +2349,8 @@
 
   const CLIENTES_KEY = "puntopuro_clientes";
   const PEDIDOS_KEY = "puntopuro_pedidos";
+  const PEDIDOS_ARCHIVO_KEY = "puntopuro_pedidos_archivo";
+  const DIAS_ARCHIVAR_PEDIDOS = 45;
   const FOLIO_KEY = "puntopuro_folio";
   const GASTOS_KEY = "puntopuro_gastos";
   const PRECIO_KEY = "puntopuro_precio";
@@ -2668,6 +2670,21 @@
     try{ localStorage.setItem(CACHE_PEDIDOS_LOCAL, JSON.stringify(pedidos)); }catch(e){ /* sin espacio o no disponible, no pasa nada */ }
   }
 
+  // pedidos ENTREGADO/CANCELADO de hace más de DIAS_ARCHIVAR_PEDIDOS días se guardan
+  // aparte, en un documento de "archivo" que casi nunca se vuelve a subir. Así, guardar
+  // un pedido nuevo del día no tiene que re-subir meses enteros de historial cada vez
+  // (eso era lo que probablemente causaba "tiempo de espera agotado" siempre: el
+  // documento de pedidos crecía sin límite y cada guardado subía todo de nuevo).
+  let pedidosArchivo = [];
+  let archivoCargado = false;
+
+  function esPedidoArchivable(p, corteTs){
+    if(!p) return false;
+    if(p.estado !== 'ENTREGADO' && p.estado !== 'CANCELADO') return false;
+    const fechaRef = p.tsEntrega || p.ts || 0;
+    return fechaRef < corteTs;
+  }
+
   async function cargarPedidos(){
     // Primero mostramos lo último que se guardó en este celular, para que el vendedor
     // nunca vea la pantalla vacía mientras llega la red (o si la red falla del todo).
@@ -2677,7 +2694,11 @@
     }
     try{
       const r = await window.storage.get(PEDIDOS_KEY, true);
-      pedidos = r ? JSON.parse(r.value) : [];
+      const activos = r ? JSON.parse(r.value) : [];
+      const ra = await window.storage.get(PEDIDOS_ARCHIVO_KEY, true);
+      pedidosArchivo = ra ? JSON.parse(ra.value) : [];
+      archivoCargado = true;
+      pedidos = pedidosArchivo.concat(activos);
       const f = await window.storage.get(FOLIO_KEY, true);
       siguienteFolio = f ? JSON.parse(f.value) : 1001;
       pedidosInicializados = true;
@@ -2693,7 +2714,21 @@
   async function guardarPedidos(){
     guardarPedidosEnCacheLocal();
     try{
-      await storageSetSeguro(PEDIDOS_KEY, JSON.stringify(pedidos), true);
+      const corteTs = Date.now() - (DIAS_ARCHIVAR_PEDIDOS * 24 * 60 * 60 * 1000);
+      if(archivoCargado){
+        const foliosArchivados = new Set(pedidosArchivo.map(p => p.folio));
+        const nuevosParaArchivar = pedidos.filter(p => esPedidoArchivable(p, corteTs) && !foliosArchivados.has(p.folio));
+        if(nuevosParaArchivar.length > 0){
+          pedidosArchivo = pedidosArchivo.concat(nuevosParaArchivar);
+          await storageSetSeguro(PEDIDOS_ARCHIVO_KEY, JSON.stringify(pedidosArchivo), true);
+        }
+        const activos = pedidos.filter(p => !esPedidoArchivable(p, corteTs));
+        await storageSetSeguro(PEDIDOS_KEY, JSON.stringify(activos), true);
+      }else{
+        // Aún no hemos cargado el archivo en este dispositivo (ej. offline desde el
+        // arranque); por seguridad no separamos nada todavía y subimos todo junto.
+        await storageSetSeguro(PEDIDOS_KEY, JSON.stringify(pedidos), true);
+      }
       await storageSetSeguro(FOLIO_KEY, JSON.stringify(siguienteFolio), true);
     }catch(e){ marcarSinConexion(); }
   }
@@ -7939,7 +7974,7 @@
 
   async function exportarRespaldoCompleto(){
     const claves = {
-      clientes: CLIENTES_KEY, pedidos: PEDIDOS_KEY, folio: FOLIO_KEY, gastos: GASTOS_KEY,
+      clientes: CLIENTES_KEY, pedidos: PEDIDOS_KEY, pedidosArchivo: PEDIDOS_ARCHIVO_KEY, folio: FOLIO_KEY, gastos: GASTOS_KEY,
       precio: PRECIO_KEY, precioPromo: PRECIO_PROMO_KEY, precioHistorial: PRECIO_HISTORIAL_KEY,
       stock: STOCK_KEY, stockLimpieza: STOCK_LIMPIEZA_KEY,
       mantenimiento: MANTENIMIENTO_KEY, proveedores: PROVEEDORES_KEY,
@@ -7958,6 +7993,10 @@
         respaldo[nombre] = r ? JSON.parse(r.value) : null;
       }catch(e){ respaldo[nombre] = null; }
     }
+    // el respaldo de pedidos ahora se guarda en dos documentos (recientes + archivo);
+    // aquí los juntamos para que el .json de respaldo siga teniendo el historial completo
+    respaldo.pedidos = (respaldo.pedidosArchivo || []).concat(respaldo.pedidos || []);
+    delete respaldo.pedidosArchivo;
     const blob = new Blob([JSON.stringify(respaldo, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -8001,6 +8040,12 @@
       }
       for(const nombre of disponibles){
         await storageSetSeguro(claves[nombre], JSON.stringify(respaldo[nombre]), true);
+      }
+      if(disponibles.includes('pedidos')){
+        // el respaldo trae el historial completo de pedidos en un solo bloque; se deja
+        // vacío el documento de "archivo" y la app lo vuelve a separar sola en el
+        // siguiente guardado normal, para no duplicar pedidos con el archivo anterior
+        await storageSetSeguro(PEDIDOS_ARCHIVO_KEY, JSON.stringify([]), true);
       }
       msg.style.color = "#0B6E63";
       msg.textContent = "Respaldo restaurado. Recargando la app...";
