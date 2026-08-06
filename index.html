@@ -155,14 +155,10 @@
     font-style:italic;
     font-weight:600;
     color:#8A6D2F;
-    font-size:0.95rem;
+    font-size:0.85rem;
     letter-spacing:0.3px;
-    padding:10px 14px;
-    border:1px solid #D9C48A;
-    border-radius:8px;
-    background:#FBF6E8;
-    max-width:280px;
-    margin:0 auto;
+    text-align:center;
+    cursor:default;
   }
 
   /* CLIENTE */
@@ -972,8 +968,8 @@
         <div class="banner-promo hidden" style="background:#0B6E63; color:#fff; padding:10px 14px; border-radius:12px; font-weight:600; text-align:center; margin-bottom:12px;"></div>
         <p class="sub">Ingresa el número de tu tarjeta de lealtad para hacer tu pedido.</p>
         <label for="tarjetaInput">Número de tarjeta / cliente</label>
-        <input type="password" id="tarjetaInput" placeholder="••••" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter'){conProcesando(document.getElementById('btnBuscarCliente'), buscarCliente);}">
-        <p class="hint">Tu número queda oculto mientras lo escribes.</p>
+        <input type="text" id="tarjetaInput" placeholder="Ej. 1234" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter'){conProcesando(document.getElementById('btnBuscarCliente'), buscarCliente);}">
+        <p class="hint">Escribe el número de tu tarjeta.</p>
         <button class="btn btn-primary" id="btnBuscarCliente" onclick="conProcesando(this, buscarCliente)">Buscar</button>
         <button class="btn btn-ghost" onclick="mostrarNuevoCliente()">Soy nuevo cliente</button>
         <a class="btn btn-ghost btn-whatsapp-negocio hidden" target="_blank" style="display:block; text-align:center; text-decoration:none;">💬 Escríbenos por WhatsApp</a>
@@ -1031,7 +1027,6 @@
           <p id="graciasPrecio" class="precio-grande"></p>
           <div id="reciboDigital"></div>
           <a class="btn btn-ghost" id="btnCompartirReferidoGracias" target="_blank" style="display:block; text-align:center; text-decoration:none; margin-top:10px;">🎁 Recomienda a un vecino y ambos reciben un descuento en su próxima compra</a>
-          <button class="btn btn-primary" onclick="reiniciarCliente()">Hacer otro pedido</button>
           <button class="btn btn-ghost" onclick="salir()">Salir</button>
         </div>
       </div>
@@ -1070,7 +1065,7 @@
             </div>
             <button onclick="cambiarCantidadNuevo(1)">+</button>
           </div>
-          <button class="btn btn-primary" id="btnGuardarNuevoCliente" onclick="guardarNuevoCliente()">Guardar cliente y venta</button>
+          <button class="btn btn-primary" id="btnGuardarNuevoCliente" onclick="guardarNuevoCliente()">Guardar cliente y hacer pedido</button>
           <p id="nuevoError" style="color:#C0392B; font-size:0.85rem; margin:10px 0 0;"></p>
         </div>
       </div>
@@ -1088,8 +1083,8 @@
         <h1 class="hero">Acceso vendedor</h1>
         <p class="sub">Ingresa tu PIN para ver los pedidos. El cliente no puede entrar aquí.</p>
         <label for="pinInput">PIN de acceso</label>
-        <input type="password" id="pinInput" placeholder="••••••" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter'){entrarVendedor();}">
-        <button class="btn btn-primary" onclick="entrarVendedor()">Entrar</button>
+        <input type="password" id="pinInput" placeholder="••••••" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter'){conProcesando(document.getElementById('btnEntrarVendedor'), entrarVendedor);}">
+        <button class="btn btn-primary" id="btnEntrarVendedor" onclick="conProcesando(this, entrarVendedor)">Entrar</button>
         <p id="pinError" style="color:#C0392B; font-size:0.85rem; margin-top:10px;"></p>
       </div>
     </div>
@@ -1306,7 +1301,7 @@
           <label style="margin-bottom:6px;">Productos de limpieza vendidos (opcional)</label>
           <div id="limpiezaListaVendedor"></div>
         </div>
-        <button class="btn btn-primary" id="vGuardarBtn" onclick="guardarNuevoClienteVendedor()">Registrar cliente y venta</button>
+        <button class="btn btn-primary" id="vGuardarBtn" onclick="guardarNuevoClienteVendedor()">Registrar cliente y hacer pedido</button>
         <p id="vError" style="color:#C0392B; font-size:0.85rem; margin-top:10px;"></p>
       </div>
     </div>
@@ -1350,8 +1345,8 @@
         <h1 class="hero">Panel PP</h1>
         <p class="sub">Acceso restringido. Introduce la contraseña de administración.</p>
         <label for="ppPinInput">Contraseña</label>
-        <input type="password" id="ppPinInput" placeholder="••••" onkeydown="if(event.key==='Enter'){entrarPP();}">
-        <button class="btn btn-primary" onclick="entrarPP()">Entrar</button>
+        <input type="password" id="ppPinInput" placeholder="••••" onkeydown="if(event.key==='Enter'){conProcesando(document.getElementById('btnEntrarPP'), entrarPP);}">
+        <button class="btn btn-primary" id="btnEntrarPP" onclick="conProcesando(this, entrarPP)">Entrar</button>
         <p id="ppPinError" style="color:#C0392B; font-size:0.85rem; margin-top:10px;"></p>
         <button class="btn btn-ghost" style="margin-top:6px;" onclick="mostrarPPOlvide()">¿Olvidaste tu contraseña?</button>
       </div>
@@ -2240,7 +2235,7 @@
     window.storage = {
       async get(key, shared){
         const snap = await _conTimeout(_col.doc(_docId(key, shared)).get());
-        if(!snap.exists) throw new Error('not found');
+        if(!snap.exists) return null; // la clave simplemente no existe todavía: no es un error de conexión
         const data = snap.data();
         return { key, value: data.value, shared: !!shared };
       },
@@ -2376,11 +2371,14 @@
     try{ localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(cola)); }catch(e){ /* almacenamiento local no disponible */ }
   }
 
+  let vistaActual = 'cliente';
+
   function actualizarBadgePendientesOffline(){
-    const cola = leerColaOffline();
-    const n = Object.keys(cola).length;
     const badge = document.getElementById('offlineBadge');
     if(!badge) return;
+    if(vistaActual === 'cliente'){ badge.classList.add('hidden'); return; }
+    const cola = leerColaOffline();
+    const n = Object.keys(cola).length;
     if(n > 0){ badge.textContent = `${n} cambio(s) sin sincronizar`; badge.classList.remove('hidden'); }
     else{ badge.classList.add('hidden'); }
   }
@@ -2423,30 +2421,45 @@
 
   let sincronizandoOffline = false;
   async function intentarSincronizarOffline(mostrarDiagnostico){
-    if(sincronizandoOffline || !navigator.onLine) return;
+    if(!navigator.onLine){
+      if(mostrarDiagnostico) alert("Tu celular dice que no tiene conexión a internet en este momento (WiFi o datos apagados, o señal muy mala). Revisa tu conexión e inténtalo de nuevo.");
+      return;
+    }
+    if(sincronizandoOffline){
+      if(mostrarDiagnostico) alert("Ya se está intentando sincronizar, espera unos segundos y vuelve a intentar.");
+      return;
+    }
     const cola = leerColaOffline();
     const claves = Object.keys(cola);
-    if(claves.length === 0) return;
+    if(claves.length === 0){
+      if(mostrarDiagnostico) alert("No hay nada pendiente por sincronizar en este celular ahora mismo. Si sigues viendo el aviso, cierra la app por completo y vuelve a abrirla.");
+      return;
+    }
     sincronizandoOffline = true;
-    for(const key of claves){
-      try{
-        await window.storage.set(key, cola[key].value, cola[key].shared);
-        const colaActual = leerColaOffline();
-        delete colaActual[key];
-        guardarColaOffline(colaActual);
-        ultimoErrorSync = "";
-      }catch(e){
-        ultimoErrorSync = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
+    try{
+      for(const key of claves){
+        try{
+          await window.storage.set(key, cola[key].value, cola[key].shared);
+          const colaActual = leerColaOffline();
+          delete colaActual[key];
+          guardarColaOffline(colaActual);
+          ultimoErrorSync = "";
+        }catch(e){
+          ultimoErrorSync = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
+        }
       }
+      actualizarBadgePendientesOffline();
+      if(Object.keys(leerColaOffline()).length === 0){
+        marcarConConexion();
+        mostrarMensajeGotita("💧 Todo sincronizado");
+      }else if(mostrarDiagnostico){
+        alert("Todavía no se pudo sincronizar.\n\nDetalle técnico: " + (ultimoErrorSync || "desconocido") + "\n\nSi dice \"permission-denied\", el problema son las reglas de Firestore (no están publicadas o caducaron). Si dice \"tiempo de espera agotado\" o \"unavailable\", es la conexión a internet.");
+      }
+    }catch(e){
+      if(mostrarDiagnostico) alert("Ocurrió un error inesperado al intentar sincronizar: " + (e && e.message ? e.message : String(e)));
+    }finally{
+      sincronizandoOffline = false;
     }
-    actualizarBadgePendientesOffline();
-    if(Object.keys(leerColaOffline()).length === 0){
-      marcarConConexion();
-      mostrarMensajeGotita("💧 Todo sincronizado");
-    }else if(mostrarDiagnostico){
-      alert("Todavía no se pudo sincronizar.\n\nDetalle técnico: " + (ultimoErrorSync || "desconocido") + "\n\nSi dice \"permission-denied\", el problema son las reglas de Firestore (no están publicadas o caducaron). Si dice \"tiempo de espera agotado\" o \"unavailable\", es la conexión a internet.");
-    }
-    sincronizandoOffline = false;
   }
 
   window.addEventListener('online', intentarSincronizarOffline);
@@ -2703,12 +2716,14 @@
   }
 
   function showView(view){
+    vistaActual = view;
     document.getElementById('viewCliente').classList.toggle('hidden', view!=='cliente');
     document.getElementById('viewVendedor').classList.toggle('hidden', view!=='vendedor');
     document.getElementById('viewPP').classList.toggle('hidden', view!=='pp');
     document.getElementById('tabClienteBtn').classList.toggle('active', view==='cliente');
     document.getElementById('tabVendedorBtn').classList.toggle('active', view==='vendedor');
     document.getElementById('tabPPBtn').classList.toggle('active', view==='pp');
+    actualizarBadgePendientesOffline();
     if(view==='vendedor'){
       if(vendedorAutenticado){
         document.getElementById('vendedorLogin').classList.add('hidden');
@@ -2851,7 +2866,7 @@
     document.getElementById('vNuevoClienteTitulo').textContent = "Nuevo cliente";
     document.getElementById('vNuevoClienteSub').textContent = "Escribe el número de tarjeta que trae impreso el código QR de la tarjeta nueva.";
     document.getElementById('vCantidadBloque').classList.remove('hidden');
-    document.getElementById('vGuardarBtn').textContent = "Registrar cliente y venta";
+    document.getElementById('vGuardarBtn').textContent = "Registrar cliente y hacer pedido";
     document.getElementById('vNumTarjeta').value = "";
     document.getElementById('vNombre').value = "";
     document.getElementById('vDireccion').value = "";
@@ -3252,7 +3267,9 @@
   async function recolectarDatosParaRespaldo(){
     await Promise.all([
       cargarClientes(), cargarPedidos(), cargarGastos(), cargarMermas(),
-      cargarProveedores(), cargarVending(), cargarCortesCaja(), cargarVendedores(), cargarTarjetasNuevas()
+      cargarProveedores(), cargarVending(), cargarCortesCaja(), cargarVendedores(), cargarTarjetasNuevas(),
+      cargarCargasVenta(), cargarCargasVentaLimpieza(), cargarDevolucionesGarrafon(), cargarDevolucionesLimpieza(),
+      cargarPrecio()
     ]);
     return {
       Clientes: Object.entries(CLIENTES).map(([id, c]) => ({
@@ -3262,8 +3279,13 @@
         FechaAlta: c.fechaAlta ? new Date(c.fechaAlta).toLocaleString('es-MX') : ''
       })),
       Pedidos: pedidos.map(p => ({
-        ClienteId: p.clienteId, Cliente: (CLIENTES[p.clienteId] && CLIENTES[p.clienteId].nombre) || '',
-        Cantidad: p.cantidad, Estado: p.estado, Repartidor: p.repartidor || '',
+        Folio: p.folio || '', ClienteId: p.clienteId, Cliente: (CLIENTES[p.clienteId] && CLIENTES[p.clienteId].nombre) || p.nombre || '',
+        Direccion: p.direccion || '', Telefono: p.telefono || '',
+        Cantidad: p.cantidad, Precio: p.precio != null ? p.precio : '', MetodoPago: p.metodoPago || '',
+        Estado: p.estado, Repartidor: p.repartidor || '',
+        GarrafonesPromo: p.garrafonesPromo || 0, GarrafonesRegalo: p.garrafonesRegaloUsados || 0,
+        GarrafonesPrecioEspecial: p.garrafonesPrecioEspecialUsados || 0, DescuentoMonto: p.descuentoMontoUsado || 0,
+        ProductosLimpieza: (p.productosLimpieza || []).map(i => `${i.nombre} (${i.litros}L)`).join('; '),
         Hora: p.hora || '', Fecha: p.ts ? new Date(p.ts).toLocaleString('es-MX') : ''
       })),
       Gastos: gastos.map(g => ({
@@ -3286,7 +3308,20 @@
       TarjetasNuevas: tarjetasNuevas.map(t => ({
         Numero: t.numero, Generada: new Date(t.ts).toLocaleString('es-MX'),
         Usada: CLIENTES[t.numero] ? 'Sí' : 'No'
-      }))
+      })),
+      CargasGarrafones: cargasVenta.map(c => ({
+        Cantidad: c.cantidad, Encargado: c.encargado || '', Fecha: c.ts ? new Date(c.ts).toLocaleString('es-MX') : (c.hora || '')
+      })),
+      CargasLimpieza: cargasVentaLimpieza.map(c => ({
+        Producto: c.nombre, Litros: c.litros, Encargado: c.encargado || '', Fecha: c.ts ? new Date(c.ts).toLocaleString('es-MX') : (c.hora || '')
+      })),
+      DevolucionesGarrafones: devolucionesGarrafon.map(d => ({
+        Cantidad: d.cantidad, Encargado: d.encargado || '', Fecha: d.ts ? new Date(d.ts).toLocaleString('es-MX') : (d.hora || '')
+      })),
+      DevolucionesLimpieza: devolucionesLimpieza.map(d => ({
+        Producto: d.nombre, Litros: d.litros, Encargado: d.encargado || '', Fecha: d.ts ? new Date(d.ts).toLocaleString('es-MX') : (d.hora || '')
+      })),
+      Precios: [{ PrecioGarrafon: precioGarrafon, PrecioGarrafonPromo: precioGarrafonPromo }]
     };
   }
 
@@ -3963,6 +3998,7 @@
   async function realizarPedido(){
     const btn = document.getElementById('btnRealizarPedido');
     if(btn){ if(btn.disabled) return; btn.disabled = true; btn.textContent = "Procesando..."; }
+    mostrarMensajeGotita("💧 Tus datos y tu pedido se están registrando...", 30000);
     try{
     await cargarPedidos();
     const { total: precioGarrafones, garrafonesPromo, mensaje: mensajePromo, garrafonesRegaloUsados, garrafonesPrecioEspecialUsados, descuentoMontoUsado } = calcularPrecioPedido(clienteActual.id, cantidadActual);
@@ -4010,6 +4046,7 @@
     muestraGratisPendiente = null;
     document.getElementById('clienteStep2').classList.add('hidden');
     document.getElementById('clienteStep3').classList.remove('hidden');
+    ocultarMensajeGotita();
 
     // A partir de aquí, todo se guarda en segundo plano (sin "await" bloqueando
     // la pantalla). Si la red falla, cada función ya sabe encolarse sola.
@@ -4037,6 +4074,44 @@
     }
   }
 
+  function numeroALetras(monto){
+    monto = Math.max(0, monto || 0);
+    const unidades = ['', 'un', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
+    const especiales10_19 = ['diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve'];
+    const decenas = ['', '', 'veinte', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+    const centenas = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+    const veintis = ['veinte','veintiún','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+    function menorMil(n){
+      if(n === 0) return '';
+      if(n === 100) return 'cien';
+      let s = '', resto = n;
+      if(resto >= 100){ s += centenas[Math.floor(resto/100)] + ' '; resto = resto % 100; }
+      if(resto >= 10 && resto < 20){ s += especiales10_19[resto-10]; return s.trim(); }
+      if(resto >= 20 && resto < 30){ s += veintis[resto-20]; return s.trim(); }
+      if(resto >= 20){
+        s += decenas[Math.floor(resto/10)];
+        if(resto % 10 > 0) s += ' y ' + unidades[resto%10];
+        return s.trim();
+      }
+      if(resto > 0) s += unidades[resto];
+      return s.trim();
+    }
+    function convertir(num){
+      if(num === 0) return 'cero';
+      let n = num, s = '';
+      const millones = Math.floor(n / 1000000); n = n % 1000000;
+      const miles = Math.floor(n / 1000); n = n % 1000;
+      if(millones > 0){ s += (millones === 1 ? 'un millón ' : menorMil(millones) + ' millones '); }
+      if(miles > 0){ s += (miles === 1 ? 'mil ' : menorMil(miles) + ' mil '); }
+      if(n > 0){ s += menorMil(n); }
+      return s.trim();
+    }
+    const entero = Math.floor(monto);
+    const centavos = Math.round((monto - entero) * 100);
+    let texto = convertir(entero) + (entero === 1 ? ' peso' : ' pesos') + ' ' + (centavos < 10 ? '0'+centavos : centavos) + '/100 M.N.';
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  }
+
   function mostrarReciboDigital(folio, nombre, direccion, cantidad, precioGarrafones, limpiezaDetalle, total){
     const cont = document.getElementById('reciboDigital');
     if(!cont) return;
@@ -4044,28 +4119,50 @@
     const colorProducto = CONFIG.ticketColorProducto || "#0B3D3A";
     const colorPrecio = CONFIG.ticketColorPrecio || "#1565C0";
     const colorTotal = CONFIG.ticketColorTotal || "#0B6E63";
-    let filas = `<div style="display:flex; justify-content:space-between;"><span style="color:${colorProducto};">${cantidad} garrafón(es)</span><span style="color:${colorPrecio}; font-weight:600;">${money(precioGarrafones)}</span></div>`;
+    let filas = `<div style="display:flex; justify-content:space-between; padding:4px 0;"><span style="color:${colorProducto};">💧 ${cantidad} garrafón(es)</span><span style="color:${colorPrecio}; font-weight:700;">${money(precioGarrafones)}</span></div>`;
     (limpiezaDetalle || []).forEach(item => {
-      filas += `<div style="display:flex; justify-content:space-between;"><span style="color:${colorProducto};">${item.nombre} (${item.litros} L)</span><span style="color:${colorPrecio}; font-weight:600;">${money(item.subtotal)}</span></div>`;
+      filas += `<div style="display:flex; justify-content:space-between; padding:4px 0;"><span style="color:${colorProducto};">🧴 ${item.nombre} (${item.litros} L)</span><span style="color:${colorPrecio}; font-weight:700;">${money(item.subtotal)}</span></div>`;
     });
     const seccionesExtra = (CONFIG.ticketSecciones || []).map(s => `
-      <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);">
+      <div style="margin-top:10px; padding-top:10px; border-top:1px dashed #D8ECE9;">
         <strong style="font-size:0.82rem; color:${colorTotal};">${s.titulo}</strong>
         <p style="font-size:0.8rem; color:#4B6E68; margin:2px 0 0; white-space:pre-line;">${s.texto}</p>
       </div>`).join('');
-    const textoCompartir = `🧾 ${CONFIG.ticketTitulo || 'Punto Puro'} #${folio}\n${CONFIG.ticketSucursal ? CONFIG.ticketSucursal + '\n' : ''}${nombre}\n${direccion}\n${fecha}\n\n` +
+    const numWhatsapp = (CONFIG.whatsappNegocio || '').replace(/\D/g, '');
+    const logoSrc = (document.querySelector('.brand img') || {}).src || '';
+    const gotitaSrc = (document.querySelector('.gotita-img') || {}).src || '';
+    const textoCompartir = `🧾 Nota digital de venta · ${CONFIG.ticketTitulo || 'Punto Puro'} #${folio}\n${CONFIG.ticketSucursal ? CONFIG.ticketSucursal + '\n' : ''}${nombre}\n${direccion}\n${fecha}\n\n` +
       `${cantidad} garrafón(es): ${money(precioGarrafones)}\n` +
       (limpiezaDetalle || []).map(i => `${i.nombre} (${i.litros}L): ${money(i.subtotal)}`).join('\n') +
       `${(limpiezaDetalle||[]).length ? '\n' : ''}Total: ${money(total)}\n\n${CONFIG.ticketMensajeFinal || ''}`;
     cont.innerHTML = `
-      <div class="totals-card" id="reciboDigitalTicket" style="margin-top:14px; text-align:left;">
-        <h2 style="margin-top:0; font-size:1.1rem;">🧾 ${CONFIG.ticketTitulo || 'Punto Puro'} · #${folio}</h2>
-        ${CONFIG.ticketSucursal ? `<p style="font-size:0.78rem; color:#4B6E68; margin:0 0 4px; white-space:pre-line;">${CONFIG.ticketSucursal}</p>` : ''}
-        <p style="font-size:0.8rem; color:#4B6E68; margin-top:0;">${fecha}</p>
-        ${filas}
-        <div style="display:flex; justify-content:space-between; font-weight:800; font-size:1.05rem; margin-top:8px; padding-top:8px; border-top:1px solid var(--line); color:${colorTotal};"><span>Total</span><span>${money(total)}</span></div>
-        ${seccionesExtra}
-        ${CONFIG.ticketMensajeFinal ? `<p style="text-align:center; font-size:0.85rem; color:${colorTotal}; font-weight:600; margin-top:12px;">${CONFIG.ticketMensajeFinal}</p>` : ''}
+      <div class="totals-card" id="reciboDigitalTicket" style="margin-top:14px; text-align:left; padding:0; overflow:hidden; border:none; box-shadow:0 6px 20px rgba(11,61,58,0.18);">
+        <div style="background:linear-gradient(135deg, var(--aqua), var(--aqua-deep)); padding:16px 18px; display:flex; align-items:center; gap:10px;">
+          ${logoSrc ? `<img src="${logoSrc}" alt="Punto Puro" style="width:44px; height:44px; border-radius:10px; object-fit:contain; background:#fff; flex-shrink:0;">` : ''}
+          <div style="flex:1; min-width:0;">
+            <div style="color:#fff; font-family:'Fraunces', serif; font-weight:800; font-size:1.15rem; line-height:1.15;">${CONFIG.ticketTitulo || 'Punto Puro'} · #${folio}</div>
+            <div style="color:#EAFBF8; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em; font-weight:700; margin-top:2px;">🧾 Nota digital de venta</div>
+          </div>
+          ${gotitaSrc ? `<img src="${gotitaSrc}" alt="" style="width:44px; height:44px; object-fit:contain; flex-shrink:0;">` : ''}
+        </div>
+        <div style="padding:16px 18px 20px; background:#fff;">
+          ${CONFIG.ticketSucursal ? `<p style="font-size:0.78rem; color:#4B6E68; margin:0 0 4px; white-space:pre-line;">${CONFIG.ticketSucursal}</p>` : ''}
+          <p style="font-size:0.8rem; color:#4B6E68; margin-top:0;">${fecha}</p>
+          <div style="background:#F4FBF9; border-radius:10px; padding:10px 12px; margin:10px 0;">
+            <div style="font-weight:700; color:${colorTotal}; font-size:0.92rem;">${nombre}</div>
+            <div style="color:#4B6E68; font-size:0.82rem; margin-top:2px;">${direccion}</div>
+          </div>
+          ${filas}
+          <div style="display:flex; justify-content:space-between; font-weight:800; font-size:1.15rem; margin-top:10px; padding-top:10px; border-top:2px solid ${colorTotal};"><span style="color:${colorTotal};">Total</span><span style="color:${colorTotal};">${money(total)}</span></div>
+          <p style="font-size:0.75rem; color:#4B6E68; text-align:right; margin:2px 0 0; font-style:italic;">(${numeroALetras(total)})</p>
+          ${seccionesExtra}
+          <div style="margin-top:14px; padding:12px; background:linear-gradient(135deg, #FFF8E1, #FBF6E8); border-radius:10px; text-align:center;">
+            <p style="font-size:0.82rem; color:#8A6D2F; font-weight:700; margin:0;">🌿💧 Con nuestra nota digital ayudas a cuidar el ambiente y el agua!!</p>
+          </div>
+          <p style="text-align:center; font-size:0.95rem; color:${colorTotal}; font-weight:800; margin-top:14px;">¡Gracias por tu compra!</p>
+          ${CONFIG.ticketMensajeFinal ? `<p style="text-align:center; font-size:0.85rem; color:${colorTotal}; font-weight:600; margin-top:8px;">${CONFIG.ticketMensajeFinal}</p>` : ''}
+          ${numWhatsapp ? `<p style="text-align:center; font-size:0.8rem; color:#4B6E68; margin-top:12px; border-top:1px dashed #D8ECE9; padding-top:10px;">📲 WhatsApp pedidos: <strong style="color:${colorTotal};">${CONFIG.whatsappNegocio}</strong></p>` : ''}
+        </div>
       </div>
       <button class="btn btn-ghost" id="btnGuardarTicket" style="margin-top:10px;" onclick="conProcesando(this, guardarTicketComoImagen)">💾 Guardar ticket</button>`;
   }
@@ -4150,7 +4247,8 @@
       err => {
         ubicacionNuevaActual = null;
         texto.textContent = "No se pudo obtener la ubicación. Puedes continuar sin ella.";
-      }
+      },
+      { timeout: 6000 }
     );
   }
 
@@ -4205,6 +4303,7 @@
     document.getElementById('nuevoAutError').style.display = "none";
     const btnNuevo = document.getElementById('btnGuardarNuevoCliente');
     if(btnNuevo){ if(btnNuevo.disabled) return; btnNuevo.disabled = true; btnNuevo.textContent = "Procesando..."; }
+    mostrarMensajeGotita("💧 Tus datos y tu pedido se están registrando...", 30000);
     try{
     await cargarClientes();
     if(tarjetaPreasignada && CLIENTES[codigoNuevo]){
@@ -4230,13 +4329,11 @@
         CLIENTES[refPendiente].garrafonesRegalo = (CLIENTES[refPendiente].garrafonesRegalo || 0) + regalo;
       }
     }
-    await guardarClientes();
 
     await cargarPedidos();
     const { total: precioPedido, garrafonesPromo, mensaje: mensajePromo, garrafonesRegaloUsados } = calcularPrecioPedido(codigoNuevo, cantidadNuevoActual);
     if(garrafonesRegaloUsados > 0){
       CLIENTES[codigoNuevo].garrafonesRegalo = Math.max(0, (CLIENTES[codigoNuevo].garrafonesRegalo || 0) - garrafonesRegaloUsados);
-      await guardarClientes();
     }
     const folio = siguienteFolio++;
     pedidos.unshift({
@@ -4251,12 +4348,13 @@
       hora: new Date().toLocaleString('es-MX', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }),
       precio: precioPedido,
       garrafonesPromo: garrafonesPromo,
+      garrafonesRegaloUsados: garrafonesRegaloUsados || 0,
       mensajePromo: mensajePromo,
       sinTarjeta: !tarjetaPreasignada
     });
-    await guardarPedidos();
-    await decrementarStockPorVenta(cantidadNuevoActual);
 
+    // Mostramos la pantalla de confirmación de inmediato — el resto se guarda
+    // en segundo plano para no dejar al cliente esperando ni dándole doble clic.
     clienteActual = { id: codigoNuevo, nombre, direccion, sinTarjeta: !tarjetaPreasignada };
     document.getElementById('graciasNombre').textContent = "¡Cliente registrado!";
     let textoNuevo = tarjetaPreasignada
@@ -4265,10 +4363,17 @@
     if(garrafonesPromo > 0){ textoNuevo += " " + mensajePromo; }
     document.getElementById('graciasTexto').textContent = textoNuevo;
     document.getElementById('graciasPrecio').textContent = "Total a pagar: " + money(precioPedido);
+    mostrarReciboDigital(folio, nombre, direccion, cantidadNuevoActual, precioPedido, [], precioPedido);
+    actualizarBotonReferido(codigoNuevo, nombre);
     document.getElementById('clienteNuevo').classList.add('hidden');
     document.getElementById('clienteStep3').classList.remove('hidden');
+    ocultarMensajeGotita();
+
+    guardarClientes();
+    guardarPedidos();
+    decrementarStockPorVenta(cantidadNuevoActual);
     }finally{
-      if(btnNuevo){ btnNuevo.disabled = false; btnNuevo.textContent = "Guardar cliente y venta"; }
+      if(btnNuevo){ btnNuevo.disabled = false; btnNuevo.textContent = "Guardar cliente y hacer pedido"; }
     }
   }
 
@@ -5914,6 +6019,14 @@
       cont.classList.remove('show');
       setTimeout(() => cont.classList.add('hidden'), 350);
     }, duracion || 2000);
+  }
+
+  function ocultarMensajeGotita(){
+    const cont = document.getElementById('gotitaMensaje');
+    if(!cont) return;
+    if(gotitaTimeout) clearTimeout(gotitaTimeout);
+    cont.classList.remove('show');
+    setTimeout(() => cont.classList.add('hidden'), 350);
   }
 
   function money(n){
