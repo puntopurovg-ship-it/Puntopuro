@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba de conexión v3 - Punto Puro</title>
+<style>
+  body{ font-family: -apple-system, sans-serif; background:#F3F5F7; margin:0; padding:24px 16px; color:#0B3D3A; }
+  h1{ font-size:1.3rem; }
+  #resultado{ background:#fff; border-radius:12px; padding:20px; margin-top:16px; font-size:1.05rem; line-height:1.7; white-space:pre-wrap; min-height:120px; }
+  .ok{ color:#0B6E63; font-weight:700; }
+  .fail{ color:#C0392B; font-weight:700; }
+  button{ margin-top:16px; padding:14px 20px; font-size:1rem; border-radius:10px; border:none; background:#0B6E63; color:#fff; font-weight:700; width:100%; }
+  #reloj{ font-size:0.85rem; color:#666; margin-top:10px; }
+</style>
+</head>
+<body>
+  <h1>🔬 Prueba de conexión v3 (SDK vs REST)</h1>
+  <p>Esta prueba compara dos formas distintas de hablar con Firestore: la conexión especial que usa la app (SDK, se queda abierta) contra una petición normal como cuando abres una página web (REST). Cada una tiene 15 segundos de límite.</p>
+  <div id="resultado">⏳ Empezando…</div>
+  <div id="reloj"></div>
+  <button onclick="location.reload()">🔁 Probar de nuevo</button>
+
+<script>
+  const salida = document.getElementById('resultado');
+  const reloj = document.getElementById('reloj');
+  let lineas = [];
+  function log(linea){ lineas.push(linea); salida.innerHTML = lineas.join('\n'); }
+
+  const inicio = Date.now();
+  const contador = setInterval(() => {
+    reloj.textContent = '⏱️ Segundos desde que abriste esta página: ' + Math.floor((Date.now() - inicio) / 1000);
+  }, 1000);
+
+  const PROJECT_ID = 'punto-puro';
+  const API_KEY = 'AIzaSyB2by3Z4mXCrQzf_WOuqLJsZ39vJBz3YLU';
+
+  function conTiempoLimite(promesa, ms){
+    return Promise.race([
+      promesa,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Sin respuesta después de ' + (ms/1000) + ' segundos')), ms))
+    ]);
+  }
+
+  function cargarScript(src){
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('No se pudo descargar: ' + src));
+      document.body.appendChild(s);
+    });
+  }
+
+  async function pruebaREST(){
+    log('');
+    log('🅰️ PRUEBA REST (petición normal, como abrir una página web)…');
+    const t0 = Date.now();
+    const docId = 'rest_' + Date.now();
+    const url = 'https://firestore.googleapis.com/v1/projects/' + PROJECT_ID + '/databases/(default)/documents/diagnostico_conexion/' + docId + '?key=' + API_KEY;
+    try{
+      const resp = await conTiempoLimite(fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { prueba: { booleanValue: true }, metodo: { stringValue: 'REST' } } })
+      }), 15000);
+      const ms = Date.now() - t0;
+      if(resp.ok){
+        log('   <span class="ok">✅ REST SÍ FUNCIONÓ — tardó ' + ms + ' ms (' + (ms/1000).toFixed(1) + 's)</span>');
+      }else{
+        const texto = await resp.text();
+        log('   <span class="fail">❌ REST respondió pero con error (código ' + resp.status + ') después de ' + ms + ' ms</span>');
+        log('   Detalle: ' + texto.slice(0, 300));
+      }
+    }catch(e){
+      const ms = Date.now() - t0;
+      log('   <span class="fail">❌ REST FALLÓ/SIN RESPUESTA después de ' + ms + ' ms: ' + e.message + '</span>');
+    }
+  }
+
+  async function pruebaSDK(){
+    log('');
+    log('🅱️ PRUEBA SDK (la conexión especial que usa la app, con caché/tiempo real)…');
+    try{
+      await cargarScript('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
+      await cargarScript('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js');
+    }catch(e){
+      log('   <span class="fail">❌ Ni siquiera se pudo descargar la librería: ' + e.message + '</span>');
+      return;
+    }
+    const firebaseConfig = {
+      apiKey: API_KEY, authDomain: "punto-puro.firebaseapp.com", projectId: PROJECT_ID,
+      storageBucket: "punto-puro.firebasestorage.app", messagingSenderId: "615820357167",
+      appId: "1:615820357167:web:31fb09fbe47ecf26c120da"
+    };
+    const app = firebase.initializeApp(firebaseConfig, 'appSDK');
+    const db = app.firestore();
+    db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
+    const t0 = Date.now();
+    try{
+      await conTiempoLimite(db.collection('diagnostico_conexion').doc('sdk_' + Date.now()).set({ prueba: true, metodo: 'SDK' }), 15000);
+      const ms = Date.now() - t0;
+      log('   <span class="ok">✅ SDK SÍ FUNCIONÓ — tardó ' + ms + ' ms (' + (ms/1000).toFixed(1) + 's)</span>');
+    }catch(e){
+      const ms = Date.now() - t0;
+      log('   <span class="fail">❌ SDK FALLÓ/SIN RESPUESTA después de ' + ms + ' ms: ' + (e.code || e.message) + '</span>');
+    }
+  }
+
+  async function correrTodo(){
+    await pruebaREST();
+    await pruebaSDK();
+    log('');
+    log('🏁 Prueba terminada.');
+    clearInterval(contador);
+    reloj.textContent += ' — terminado, manda captura completa';
+  }
+
+  correrTodo();
+</script>
+</body>
+</html>
