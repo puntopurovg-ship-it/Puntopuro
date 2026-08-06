@@ -445,6 +445,15 @@
     margin:0 auto 14px;
   }
   #syncTag.offline{ color:var(--sun); }
+  #syncIndicator{
+    display:inline-flex; align-items:center; gap:3px; cursor:pointer;
+    font-size:0.72rem; color:rgba(255,255,255,0.6); line-height:1;
+  }
+  #syncIndicator.offline{ color:#FFD166; }
+  #syncCount{
+    background:#FFD166; color:#0B3B36; border-radius:8px; font-weight:700;
+    font-size:0.62rem; padding:1px 5px; min-width:14px; text-align:center;
+  }
   .back-link{
     background:none; border:none; color:var(--aqua-deep);
     font-family:'Space Grotesk', sans-serif; font-weight:600; font-size:0.85rem;
@@ -935,8 +944,9 @@
 
 <div class="topbar">
   <div class="topbar-controls">
-    <span id="syncTag" style="font-size:0.68rem; color:rgba(255,255,255,0.55); text-transform:uppercase; letter-spacing:0.05em;">en línea</span>
-    <span id="offlineBadge" class="hidden" style="font-size:0.68rem; color:#FFD166; text-transform:uppercase; letter-spacing:0.05em; cursor:pointer; max-width:150px; white-space:normal; line-height:1.3;" onclick="intentarSincronizarOffline(true)">0 cambio(s) sin sincronizar</span>
+    <span id="syncIndicator" onclick="intentarSincronizarOffline(true)" title="Toca para ver el detalle">
+      <span id="syncIcon">✅</span><span id="syncCount" class="hidden">0</span>
+    </span>
     <div class="switch">
       <button id="tabPPBtn" onclick="showView('pp')">PP</button>
       <button id="tabVendedorBtn" onclick="showView('vendedor')">Vendedor</button>
@@ -1678,6 +1688,7 @@
           <p style="font-size:0.85rem; margin:4px 0;">Cambios pendientes: <strong id="diagPendientes">—</strong></p>
           <p style="font-size:0.85rem; margin:4px 0;">Último error: <strong id="diagUltimoError">Ninguno registrado</strong></p>
           <p style="font-size:0.85rem; margin:4px 0;">Hora del error: <strong id="diagUltimoErrorHora">—</strong></p>
+          <p style="font-size:0.85rem; margin:4px 0;">Errores guardados en historial (se van al Excel): <strong id="diagHistorialCount">—</strong></p>
           <button class="btn btn-ghost" style="margin-top:8px;" onclick="copiarDiagnosticoSync()">📋 Copiar diagnóstico</button>
           <button class="btn btn-ghost" style="margin-top:8px;" onclick="enviarDiagnosticoSyncWhatsapp()">💬 Enviar diagnóstico por WhatsApp</button>
           <p id="diagCopiadoMsg" style="font-size:0.8rem; color:#0B6E63; margin-top:6px;"></p>
@@ -2369,26 +2380,30 @@
   let bitacoraActual = 'calidad';
   let bitacoras = { calidad: [], limpieza: [], plagas: [], laboratorio: [], capacitacion: [] };
 
-  // La etiqueta de arriba (syncTag) ya NO depende solo de si la última operación
-  // tuvo éxito o falló: siempre refleja el estado real de la cola completa de
-  // pendientes, para que nunca diga "sincronizado" mientras todavía haya
-  // cambios atorados sin subir (eso era lo que causaba el mensaje contradictorio).
+  // El indicador de arriba ya NO es un bloque de texto en mayúsculas siempre visible:
+  // ahora es un ícono chiquito con un numerito (como las apps de mensajería), y el
+  // detalle completo solo aparece si lo tocas. Además, ya no depende de la última
+  // operación suelta: siempre refleja el estado real de la cola completa de pendientes.
   function actualizarEtiquetaSync(){
-    const tag = document.getElementById('syncTag');
-    if(!tag) return;
-    if(sinConexion){
-      tag.textContent = "modo local";
-      tag.classList.add('offline');
-      return;
-    }
+    const ind = document.getElementById('syncIndicator');
+    const icon = document.getElementById('syncIcon');
+    const count = document.getElementById('syncCount');
+    if(!ind || !icon || !count) return;
+    if(vistaActual === 'cliente'){ ind.classList.add('hidden'); return; }
+    ind.classList.remove('hidden');
     const pendientes = Object.keys(leerColaOffline()).length;
-    if(pendientes > 0){
-      tag.textContent = "sincronizando…";
-      tag.classList.add('offline');
+    if(sinConexion){
+      icon.textContent = "📴";
+      ind.classList.add('offline');
+    }else if(pendientes > 0){
+      icon.textContent = "🔄";
+      ind.classList.add('offline');
     }else{
-      tag.textContent = "sincronizado";
-      tag.classList.remove('offline');
+      icon.textContent = "✅";
+      ind.classList.remove('offline');
     }
+    if(pendientes > 0){ count.textContent = String(pendientes); count.classList.remove('hidden'); }
+    else{ count.classList.add('hidden'); }
   }
 
   function marcarSinConexion(){
@@ -2415,18 +2430,8 @@
   let vistaActual = 'cliente';
 
   function actualizarBadgePendientesOffline(){
-    const badge = document.getElementById('offlineBadge');
-    if(badge){
-      if(vistaActual === 'cliente'){ badge.classList.add('hidden'); }
-      else{
-        const cola = leerColaOffline();
-        const n = Object.keys(cola).length;
-        if(n > 0){ badge.textContent = `${n} cambio(s) sin sincronizar`; badge.classList.remove('hidden'); }
-        else{ badge.classList.add('hidden'); }
-      }
-    }
-    // Cada vez que se recalcula el número de pendientes, la etiqueta de arriba
-    // se vuelve a evaluar también, así los dos avisos siempre dicen lo mismo.
+    // El ícono compacto (syncIndicator) ya se encarga de mostrar el número de
+    // pendientes; esta función ahora solo dispara la actualización de ambos.
     actualizarEtiquetaSync();
     actualizarPanelDiagnosticoSync();
   }
@@ -2441,6 +2446,8 @@
     document.getElementById('diagPendientes').textContent = String(pendientes);
     document.getElementById('diagUltimoError').textContent = ultimoErrorSync || "Ninguno registrado";
     document.getElementById('diagUltimoErrorHora').textContent = ultimoErrorSyncTs ? new Date(ultimoErrorSyncTs).toLocaleString('es-MX') : "—";
+    const elHist = document.getElementById('diagHistorialCount');
+    if(elHist) elHist.textContent = String(leerHistorialErroresSync().length);
   }
 
   function textoDiagnosticoSync(){
@@ -2483,6 +2490,24 @@
   let ultimoErrorSync = "";
   let ultimoErrorSyncTs = null;
 
+  const HISTORIAL_ERRORES_KEY = "puntopuro_historial_errores_sync";
+
+  function leerHistorialErroresSync(){
+    try{ return JSON.parse(localStorage.getItem(HISTORIAL_ERRORES_KEY) || '[]'); }
+    catch(e){ return []; }
+  }
+
+  // Guarda cada error de sincronización que ocurra (con fecha y la clave que falló),
+  // para poder verlos todos después en el Excel, no solo el más reciente.
+  function registrarErrorSync(clave, error){
+    try{
+      const arr = leerHistorialErroresSync();
+      arr.push({ ts: Date.now(), clave: clave || '', error: error || '' });
+      while(arr.length > 300) arr.shift(); // se guardan como máximo los últimos 300
+      localStorage.setItem(HISTORIAL_ERRORES_KEY, JSON.stringify(arr));
+    }catch(e){ /* almacenamiento local no disponible */ }
+  }
+
   async function storageSetSeguro(key, value, shared){
     try{
       if(!navigator.onLine) throw new Error('sin conexión');
@@ -2496,6 +2521,7 @@
     }catch(e){
       ultimoErrorSync = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
       ultimoErrorSyncTs = Date.now();
+      registrarErrorSync(key, ultimoErrorSync);
       marcarSinConexion();
       const cola = leerColaOffline();
       cola[key] = { value, shared, ts: Date.now() };
@@ -2533,6 +2559,7 @@
         }catch(e){
           ultimoErrorSync = (e && (e.code || e.message)) ? String(e.code || e.message) : String(e);
           ultimoErrorSyncTs = Date.now();
+          registrarErrorSync(key, ultimoErrorSync);
         }
       }
       actualizarBadgePendientesOffline();
@@ -2550,7 +2577,7 @@
   }
 
   window.addEventListener('online', intentarSincronizarOffline);
-  setInterval(intentarSincronizarOffline, 20000);
+  setInterval(intentarSincronizarOffline, 10000);
 
   async function cargarClientes(){
     try{
@@ -3319,6 +3346,22 @@
 
     const vendedoresArr = vendedores.map(v => ({ Nombre: v.nombre, PIN: v.pin, Activo: v.activo ? 'Sí' : 'No' }));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(vendedoresArr), "Vendedores");
+
+    const pendientesActuales = Object.keys(leerColaOffline()).length;
+    const estadoActual = sinConexion ? "modo local" : (pendientesActuales > 0 ? "sincronizando…" : "sincronizado");
+    const diagnosticoArr = [{
+      Estado: estadoActual, CambiosPendientes: pendientesActuales,
+      UltimoError: ultimoErrorSync || "Ninguno registrado",
+      HoraUltimoError: ultimoErrorSyncTs ? new Date(ultimoErrorSyncTs).toLocaleString('es-MX') : '',
+      GeneradoEl: new Date().toLocaleString('es-MX')
+    }];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(diagnosticoArr), "Diagnostico");
+
+    const erroresArr = leerHistorialErroresSync().map(e => ({
+      Fecha: new Date(e.ts).toLocaleString('es-MX'), Clave: e.clave, Error: e.error
+    }));
+    if(erroresArr.length === 0){ erroresArr.push({ Fecha: '', Clave: '', Error: 'Sin errores registrados en este celular' }); }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(erroresArr), "ErroresSync");
 
     XLSX.writeFile(wb, `puntopuro_datos_${new Date().toISOString().slice(0,10)}.xlsx`);
   }
