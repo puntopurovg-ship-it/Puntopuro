@@ -2269,18 +2269,62 @@
       throw ultimoError;
     }
 
+    // ---- Camino alterno por REST ----
+    // La conexión especial que usa el SDK (la de arriba) a veces se queda pegada sin
+    // avisar en ciertas redes, aunque el resto de internet funcione bien. Como respaldo,
+    // aquí hay una segunda forma de hablar con Firestore: una petición HTTP normal,
+    // igual que cuando se abre cualquier página web. Si el SDK falla, se intenta esto.
+    const _restUrl = (docId) => 'https://firestore.googleapis.com/v1/projects/' + firebaseConfig.projectId +
+      '/databases/(default)/documents/ppStorage/' + encodeURIComponent(docId) + '?key=' + firebaseConfig.apiKey;
+    async function _restFetch(url, options, ms){
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), ms);
+      try{ return await fetch(url, Object.assign({}, options, { signal: controller.signal })); }
+      finally{ clearTimeout(t); }
+    }
+    async function _restGet(key, shared){
+      const resp = await _restFetch(_restUrl(_docId(key, shared)), { method: 'GET' }, 9000);
+      if(resp.status === 404) return null;
+      if(!resp.ok) throw new Error('REST get falló: ' + resp.status);
+      const data = await resp.json();
+      const f = data.fields || {};
+      return { key, value: f.value ? f.value.stringValue : undefined, shared: !!shared };
+    }
+    async function _restSet(key, value, shared){
+      const body = { fields: { key: { stringValue: String(key) }, shared: { booleanValue: !!shared }, value: { stringValue: String(value) } } };
+      const resp = await _restFetch(_restUrl(_docId(key, shared)), {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      }, 9000);
+      if(!resp.ok){ const t = await resp.text().catch(() => ''); throw new Error('REST set falló: ' + resp.status + ' ' + t.slice(0, 150)); }
+      return { key, value, shared: !!shared };
+    }
+    // Intenta el SDK primero (más rápido normalmente); si falla del todo, intenta por REST
+    // antes de darse por vencido. Cualquiera de los dos que funcione es suficiente.
+    async function _conRespaldoRest(intentarSDK, intentarREST){
+      try{ return await intentarSDK(); }
+      catch(errorSDK){
+        try{ return await intentarREST(); }
+        catch(errorREST){
+          throw errorSDK; // se reporta el error del SDK, que es el camino principal
+        }
+      }
+    }
+
     window.storage = {
       async get(key, shared){
-        const snap = await _conReintentos(() => _col.doc(_docId(key, shared)).get());
-        if(!snap.exists) return null; // la clave simplemente no existe todavía: no es un error de conexión
-        const data = snap.data();
-        return { key, value: data.value, shared: !!shared };
+        const r = await _conRespaldoRest(
+          () => _conReintentos(() => _col.doc(_docId(key, shared)).get(), 2, 8000).then(snap => snap.exists ? { key, value: snap.data().value, shared: !!shared } : null),
+          () => _conReintentos(() => _restGet(key, shared), 2, 8000)
+        );
+        return r;
       },
       async set(key, value, shared){
         return _encolar(async () => {
           const payload = { key, shared: !!shared, value, actualizado: firebase.firestore.FieldValue.serverTimestamp() };
-          await _conReintentos(() => _col.doc(_docId(key, shared)).set(payload));
-          return { key, value, shared: !!shared };
+          return _conRespaldoRest(
+            () => _conReintentos(() => _col.doc(_docId(key, shared)).set(payload), 2, 8000).then(() => ({ key, value, shared: !!shared })),
+            () => _conReintentos(() => _restSet(key, value, shared), 2, 8000)
+          );
         });
       },
       async delete(key, shared){
