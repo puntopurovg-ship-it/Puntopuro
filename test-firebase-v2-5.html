@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba de conexión - Punto Puro</title>
+<style>
+  body{ font-family: -apple-system, sans-serif; background:#F3F5F7; margin:0; padding:24px 16px; color:#0B3D3A; }
+  h1{ font-size:1.3rem; }
+  #resultado{ background:#fff; border-radius:12px; padding:20px; margin-top:16px; font-size:1.05rem; line-height:1.7; white-space:pre-wrap; min-height:120px; }
+  .ok{ color:#0B6E63; font-weight:700; }
+  .fail{ color:#C0392B; font-weight:700; }
+  button{ margin-top:16px; padding:14px 20px; font-size:1rem; border-radius:10px; border:none; background:#0B6E63; color:#fff; font-weight:700; width:100%; }
+  #reloj{ font-size:0.85rem; color:#666; margin-top:10px; }
+</style>
+</head>
+<body>
+  <h1>🔬 Prueba directa de conexión a Firebase</h1>
+  <p>Esto NO es la app completa, es solo una prueba aislada. Este texto ya se está viendo aunque nada haya cargado todavía — si de aquí no avanza nada, el problema es de red, no de que la página esté "trabada".</p>
+  <div id="resultado">⏳ Empezando la prueba…</div>
+  <div id="reloj"></div>
+  <button onclick="location.reload()">🔁 Probar de nuevo</button>
+
+<script>
+  const salida = document.getElementById('resultado');
+  const reloj = document.getElementById('reloj');
+  let lineas = [];
+  function log(linea){ lineas.push(linea); salida.innerHTML = lineas.join('\n'); }
+
+  // Contador visible para que quede claro que la página SIGUE viva mientras espera,
+  // no que se congeló — si esto sigue subiendo, todavía está intentando.
+  const inicio = Date.now();
+  const contador = setInterval(() => {
+    reloj.textContent = '⏱️ Segundos desde que abriste esta página: ' + Math.floor((Date.now() - inicio) / 1000);
+  }, 1000);
+
+  log('📱 navigator.onLine dice: ' + navigator.onLine);
+  log('');
+  log('1️⃣ Descargando la librería de Firebase desde internet…');
+
+  // Si en 10 segundos ni siquiera la librería de Firebase (un archivo de Google)
+  // logró descargarse, es una señal MUY fuerte de que algo está bloqueando el
+  // acceso a servicios de Google desde esta red, no solo que Firestore esté lento.
+  let libreriaCargo = false;
+  setTimeout(() => {
+    if(!libreriaCargo){
+      log('   <span class="fail">❌ Después de 10 segundos, la librería de Firebase todavía NO ha logrado descargarse.</span>');
+      log('   Esto pasa ANTES de siquiera intentar guardar nada — es decir, ni el archivo básico de Google (gstatic.com) está llegando.');
+      log('   👉 Esto apunta a que tu red (datos móviles o WiFi/router) está bloqueando o filtrando el tráfico hacia servicios de Google, no que Firebase esté fallando por sí solo.');
+      log('   Prueba: abre en este mismo celular https://www.google.com — si eso tampoco carga bien, es tu red en general. Si Google sí abre normal pero esto no, puede ser un bloqueo específico a dominios de Firebase/gstatic (común en algunas redes corporativas, escolares, o de ciertos operadores en México).');
+    }
+  }, 10000);
+
+  function cargarScript(src){
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('No se pudo descargar: ' + src));
+      document.body.appendChild(s);
+    });
+  }
+
+  async function correrPrueba(){
+    try{
+      await cargarScript('https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js');
+      await cargarScript('https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js');
+      libreriaCargo = true;
+      log('   <span class="ok">✅ Librería descargada (' + (Date.now() - inicio) + ' ms)</span>');
+    }catch(e){
+      log('   <span class="fail">❌ Nunca se pudo descargar la librería de Firebase: ' + e.message + '</span>');
+      log('   👉 Esto confirma bloqueo de red hacia gstatic.com/Google, no un problema de la app.');
+      clearInterval(contador);
+      return;
+    }
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyB2by3Z4mXCrQzf_WOuqLJsZ39vJBz3YLU",
+      authDomain: "punto-puro.firebaseapp.com",
+      projectId: "punto-puro",
+      storageBucket: "punto-puro.firebasestorage.app",
+      messagingSenderId: "615820357167",
+      appId: "1:615820357167:web:31fb09fbe47ecf26c120da"
+    };
+
+    let db;
+    try{
+      log('');
+      log('2️⃣ Inicializando Firebase…');
+      const app = firebase.initializeApp(firebaseConfig);
+      db = app.firestore();
+      db.settings({ experimentalForceLongPolling: true, useFetchStreams: false });
+      log('   <span class="ok">✅ Inicializado sin error</span>');
+    }catch(e){
+      log('   <span class="fail">❌ Falló al inicializar: ' + (e && e.message ? e.message : e) + '</span>');
+      clearInterval(contador);
+      return;
+    }
+
+    const docRef = db.collection('diagnostico_conexion').doc('prueba_' + Date.now());
+    const t0 = Date.now();
+    log('');
+    log('3️⃣ Intentando GUARDAR un dato de prueba (sin límite de tiempo, para ver cuánto tarda de verdad)…');
+    try{
+      await docRef.set({ prueba: true, hecho_en: new Date().toString(), ts: Date.now() });
+      const ms = Date.now() - t0;
+      log('   <span class="ok">✅ ¡SÍ SE GUARDÓ! Tardó ' + ms + ' ms (' + (ms/1000).toFixed(1) + ' segundos)</span>');
+    }catch(e){
+      const ms = Date.now() - t0;
+      log('   <span class="fail">❌ FALLÓ después de ' + ms + ' ms</span>');
+      log('   <span class="fail">Error exacto: ' + (e && (e.code || e.message) ? (e.code || e.message) : String(e)) + '</span>');
+      log('');
+      log('👉 Con este error exacto (código: ' + (e && e.code ? e.code : 'sin código') + ') ya sabemos qué es. Mándaselo a Claude tal cual.');
+      clearInterval(contador);
+      return;
+    }
+
+    const t1 = Date.now();
+    log('');
+    log('4️⃣ Intentando LEER ese mismo dato de vuelta…');
+    try{
+      const snap = await docRef.get();
+      const ms = Date.now() - t1;
+      if(snap.exists){
+        log('   <span class="ok">✅ ¡SÍ SE LEYÓ! Tardó ' + ms + ' ms. Dato: ' + JSON.stringify(snap.data()) + '</span>');
+      }else{
+        log('   <span class="fail">⚠️ Se guardó pero al leerlo dice que no existe (raro)</span>');
+      }
+    }catch(e){
+      const ms = Date.now() - t1;
+      log('   <span class="fail">❌ Falló la lectura después de ' + ms + ' ms: ' + (e && (e.code || e.message) ? (e.code || e.message) : String(e)) + '</span>');
+      clearInterval(contador);
+      return;
+    }
+
+    log('');
+    log('<span class="ok">🎉 TODO BIEN: Firebase sí funciona desde este celular y esta red.</span>');
+    clearInterval(contador);
+    reloj.textContent += ' — prueba terminada';
+  }
+
+  correrPrueba();
+</script>
+</body>
+</html>
